@@ -1,0 +1,75 @@
+.timelineContainer {
+    padding: 1rem 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.track {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    background-color: #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.selectedRange {
+    position: absolute;
+    height: 100%;
+    background-color: #007bff;
+    border-radius: 5px;
+    pointer-events: none;
+}
+
+.handle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border: 2px solid #007bff;
+    border-radius: 50%;
+    cursor: grab;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.handle:active {
+    cursor: grabbing;
+}
+
+.scrubber {
+    position: absolute;
+    top: -5px;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 20px;
+    background-color: #dc3545;
+    border-radius: 2px;
+    cursor: grab;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.scrubberHandle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: grab;
+    z-index: 21;
+}
+
+
+.timeLabels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #555;
+    padding: 0 2px;
+}

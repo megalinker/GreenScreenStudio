@@ -1,0 +1,316 @@
+.container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    background-color: #eef2f5;
+    color: #333;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.main {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    overflow: hidden;
+}
+
+.previewArea {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    border: 2px dashed #444;
+    border-radius: 8px;
+    margin: 1rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.placeholder h3 {
+    color: #ccc;
+    font-weight: 400;
+}
+
+.controlsPanel {
+    width: 350px;
+    flex-shrink: 0;
+    background-color: #ffffff;
+    padding: 1.5rem;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.05);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.panelTitle {
+    margin-top: 0;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.controlGroup {
+    margin-bottom: 1.5rem;
+}
+
+.label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #222;
+}
+
+.input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+input[type="range"] {
+    padding: 0;
+    cursor: pointer;
+}
+
+input[type="color"] {
+    min-height: 40px;
+    padding: 5px;
+    cursor: pointer;
+}
+
+.colorSwatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-left: 10px;
+    border: 1px solid #ddd;
+}
+
+.divider {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 1.5rem 0;
+}
+
+.iconButton {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 10px;
+    cursor: pointer;
+    color: #555;
+    display: flex;
+    align-items: center;
+}
+
+.iconButton:hover {
+    color: #000;
+}
+
+.exportSection {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.exportButton {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+    background-color: #007bff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.exportButton:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+.exportButton:disabled {
+    background-color: #a0a0a0;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.progressContainer {
+    width: 100%;
+    text-align: center;
+}
+
+.progressLabel {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.progressBar {
+    width: 100%;
+    height: 10px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.progressBarFill {
+    height: 100%;
+    background-color: #007bff;
+    border-radius: 5px;
+    transition: width 0.3s ease-in-out;
+}
+
+.completedContainer,
+.failedContainer {
+    text-align: center;
+}
+
+.completedContainer p,
+.failedContainer p {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-top: 0;
+}
+
+.completedContainer p {
+    color: #28a745;
+}
+
+.failedContainer p {
+    color: #dc3545;
+}
+
+.failedContainer small {
+    display: block;
+    margin-bottom: 1rem;
+    color: #666;
+    word-wrap: break-word;
+}
+
+.resetButton {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    color: #333;
+}
+
+.resetButton:hover {
+    background-color: #f0f0f0;
+    border-color: #aaa;
+}
+
+.fieldset {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.fieldset:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.fieldset legend {
+    font-weight: 600;
+    padding: 0 0.5rem;
+    margin-left: 0.5rem;
+}
+
+.fileInputsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.inputWithButton {
+    display: flex;
+    gap: 10px;
+}
+
+.inputWithButton .input {
+    flex-grow: 1;
+}
+
+.inputWithButton button {
+    flex-shrink: 0;
+    padding: 0 1rem;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.inputWithButton button:hover {
+    background-color: #e0e0e0;
+}
+
+.inputWithButton button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .controlsPanel {
+        width: 100%;
+        box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.05);
+        box-sizing: border-box;
+    }
+
+    .main {
+        padding-bottom: 1rem;
+    }
+}
