@@ -47,6 +47,12 @@ interface BoundingBox {
     rotation: number,
 }
 
+interface MediaProperties {
+    width: number;
+    height: number;
+    duration: number;
+}
+
 const SNAP_TOLERANCE = 8;
 
 const DropperIcon = () => (
@@ -111,7 +117,8 @@ const Previewer: React.FC = () => {
 
     const [exportFormat, setExportFormat] = useState<'mp4' | 'prores' | 'webm' | 'gif'>('mp4');
 
-    const [sourceInfo, setSourceInfo] = useState<{ duration: number; width: number; height: number; } | null>(null);
+    const [sourceInfo, setSourceInfo] = useState<MediaProperties | null>(null);
+    const [backgroundInfo, setBackgroundInfo] = useState<MediaProperties | null>(null);
     const [resolution, setResolution] = useState('720p');
     const [loop, setLoop] = useState('none');
     const [startTime, setStartTime] = useState(0);
@@ -259,35 +266,44 @@ const Previewer: React.FC = () => {
         if (isTransparentMode) setExportFormat('prores');
     }, [isTransparentMode]);
 
+    // This effect runs when a source file is selected and its properties are extracted
     useEffect(() => {
-        const canStartSession = sourceVideoFile && (isTransparentMode || backgroundFile);
+        if (sourceInfo) {
+            const initialFg = getInitialFgTransform(sourceInfo.width, sourceInfo.height);
+            const initialBg = backgroundInfo ? getInitialBgTransform(backgroundInfo.width, backgroundInfo.height) : backgroundTransform;
+
+            setForegroundTransform(initialFg);
+            setBackgroundTransform(initialBg);
+
+            setHistory([{ fg: initialFg, bg: initialBg }]);
+            setHistoryIndex(0);
+            setStartTime(0);
+            setEndTime(sourceInfo.duration);
+        }
+    }, [sourceInfo, backgroundInfo]);
+
+
+    // This effect triggers the upload once all required files are present
+    useEffect(() => {
+        const canStartSession = sourceVideoFile && sourceInfo && (isTransparentMode || (backgroundFile && backgroundInfo));
         if (canStartSession) {
             const uploadFiles = async () => {
                 resetStateForNewJob();
                 setIsUploading(true);
                 const formData = new FormData();
-                formData.append('sourceVideo', sourceVideoFile!);
+                formData.append('sourceVideo', sourceVideoFile);
+                formData.append('sourceProperties', JSON.stringify(sourceInfo));
                 formData.append('isTransparent', isTransparentMode ? 'true' : 'false');
-                if (!isTransparentMode && backgroundFile) formData.append('background', backgroundFile);
+                if (!isTransparentMode && backgroundFile && backgroundInfo) {
+                    formData.append('background', backgroundFile);
+                    formData.append('backgroundProperties', JSON.stringify(backgroundInfo));
+                }
 
                 try {
                     const response = await fetch('http://localhost:5000/api/process', { method: 'POST', body: formData });
                     if (!response.ok) throw new Error('File upload failed on the server.');
                     const data = await response.json();
                     setJobId(data.jobId);
-                    const { sourceWidth, sourceHeight, backgroundWidth, backgroundHeight, sourceDuration } = data;
-                    setSourceInfo({ duration: sourceDuration, width: sourceWidth, height: sourceHeight });
-
-                    const initialFg = getInitialFgTransform(sourceWidth, sourceHeight);
-                    const initialBg = getInitialBgTransform(backgroundWidth, backgroundHeight);
-                    setForegroundTransform(initialFg);
-                    setBackgroundTransform(initialBg);
-
-                    setHistory([{ fg: initialFg, bg: initialBg }]);
-                    setHistoryIndex(0);
-
-                    setStartTime(0);
-                    setEndTime(sourceDuration);
                     setIsReadyForPreview(true);
                 } catch (error) {
                     console.error('Upload Error:', error);
@@ -298,7 +314,7 @@ const Previewer: React.FC = () => {
             };
             uploadFiles();
         }
-    }, [sourceVideoFile, backgroundFile, isTransparentMode]);
+    }, [sourceVideoFile, sourceInfo, backgroundFile, backgroundInfo, isTransparentMode]);
 
     const requestPreviewUpdate = useCallback((timestamp?: number) => {
         if (ws.current?.readyState === WebSocket.OPEN && jobId) {
@@ -845,9 +861,9 @@ const Previewer: React.FC = () => {
                         </label>
                     </div>
                     <div className={styles.fileInputsContainer}>
-                        <FileInput key={`source-${fileInputKey}`} label="Source Video" acceptedTypes="video/*" onFileSelect={(file) => { setSourceVideoFile(file); }} />
+                        <FileInput key={`source-${fileInputKey}`} label="Source Video" acceptedTypes="video/*" onFileSelect={(file, props) => { setSourceVideoFile(file); setSourceInfo(props); }} />
                         {!isTransparentMode && (
-                            <FileInput key={`background-${fileInputKey}`} label="Background" acceptedTypes="image/*,video/*" onFileSelect={(file, url) => { setBackgroundFile(file); setBackgroundPreviewUrl(url); }} />
+                            <FileInput key={`background-${fileInputKey}`} label="Background" acceptedTypes="image/*,video/*" onFileSelect={(file, props, url) => { setBackgroundFile(file); setBackgroundInfo(props); setBackgroundPreviewUrl(url); }} />
                         )}
                     </div>
                 </CollapsibleSection>

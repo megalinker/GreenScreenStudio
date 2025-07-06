@@ -3,53 +3,92 @@ import styles from './FileInput.module.css';
 
 const Spinner = () => <div className={styles.spinner}></div>;
 
+interface MediaProperties {
+    width: number;
+    height: number;
+    duration: number;
+}
+
 interface FileInputProps {
     label: string;
     acceptedTypes: string;
-    onFileSelect: (file: File, previewUrl: string | null) => void;
+    onFileSelect: (file: File, properties: MediaProperties, previewUrl: string | null) => void;
     disabled?: boolean;
 }
 
 /**
- * Generates a thumbnail for a video file locally in the browser.
- * @param videoFile The video file.
- * @returns A promise that resolves with a base64 data URL of the thumbnail.
+ * Extracts properties (width, height, duration) and a thumbnail for a media file.
+ * @param mediaFile The video or image file.
+ * @returns A promise that resolves with the properties and a preview URL.
  */
-const generateVideoThumbnail = (videoFile: File): Promise<string> => {
+const getMediaDetails = (mediaFile: File): Promise<{ properties: MediaProperties; previewUrl: string | null }> => {
     return new Promise((resolve, reject) => {
-        const video = document.createElement('video');
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
+        if (mediaFile.type.startsWith('video/')) {
+            const video = document.createElement('video');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
 
-        if (!context) {
-            return reject(new Error('Canvas 2D context is not supported.'));
+            if (!context) {
+                return reject(new Error('Canvas 2D context is not supported.'));
+            }
+
+            let details = {
+                properties: { width: 0, height: 0, duration: 0 },
+                previewUrl: null as string | null,
+            };
+
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+
+            video.addEventListener('loadedmetadata', () => {
+                details.properties = {
+                    width: video.videoWidth,
+                    height: video.videoHeight,
+                    duration: video.duration,
+                };
+                video.currentTime = Math.min(1, video.duration / 2);
+            });
+
+            video.addEventListener('seeked', () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                details.previewUrl = canvas.toDataURL('image/jpeg');
+                URL.revokeObjectURL(video.src);
+                resolve(details);
+            });
+
+            video.addEventListener('error', (e) => {
+                URL.revokeObjectURL(video.src);
+                if (details.properties.width > 0) {
+                    resolve(details);
+                } else {
+                    reject(new Error('Failed to load video for property extraction.'));
+                }
+            });
+
+            video.src = URL.createObjectURL(mediaFile);
+
+        } else if (mediaFile.type.startsWith('image/')) {
+            const img = new Image();
+            const url = URL.createObjectURL(mediaFile);
+            img.onload = () => {
+                const properties = {
+                    width: img.width,
+                    height: img.height,
+                    duration: 0,
+                };
+                resolve({ properties, previewUrl: url });
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to load image.'));
+            };
+            img.src = url;
+        } else {
+            reject(new Error('Unsupported file type.'));
         }
-
-        video.muted = true;
-        video.playsInline = true;
-
-        video.addEventListener('loadeddata', () => {
-            video.currentTime = Math.min(1, video.duration / 2);
-        });
-
-        video.addEventListener('seeked', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            URL.revokeObjectURL(video.src);
-
-            resolve(canvas.toDataURL('image/jpeg'));
-        });
-
-        video.addEventListener('error', (e) => {
-            URL.revokeObjectURL(video.src);
-            reject(new Error('Failed to load video for thumbnail generation.'));
-        });
-
-        const url = URL.createObjectURL(videoFile);
-        video.src = url;
     });
 };
 
@@ -58,32 +97,27 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
     const [isDragging, setIsDragging] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const handleFile = useCallback(async (selectedFile: File) => {
         if (disabled) return;
 
         setFile(selectedFile);
-        let finalPreviewUrl: string | null = null;
+        setIsProcessing(true);
+        setPreviewUrl(null);
 
-        if (selectedFile.type.startsWith('image/')) {
-            finalPreviewUrl = URL.createObjectURL(selectedFile);
+        try {
+            const { properties, previewUrl: finalPreviewUrl } = await getMediaDetails(selectedFile);
             setPreviewUrl(finalPreviewUrl);
-        } else if (selectedFile.type.startsWith('video/')) {
-            setIsGeneratingThumbnail(true);
+            onFileSelect(selectedFile, properties, finalPreviewUrl);
+        } catch (error) {
+            console.error("Media detail extraction failed:", error);
+            alert(`Could not process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setFile(null);
             setPreviewUrl(null);
-            try {
-                finalPreviewUrl = await generateVideoThumbnail(selectedFile);
-                setPreviewUrl(finalPreviewUrl);
-            } catch (error) {
-                console.error("Video thumbnail generation failed:", error);
-                setPreviewUrl(null);
-            } finally {
-                setIsGeneratingThumbnail(false);
-            }
+        } finally {
+            setIsProcessing(false);
         }
-
-        onFileSelect(selectedFile, finalPreviewUrl);
     }, [onFileSelect, disabled]);
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -115,11 +149,11 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
     };
 
     const renderContent = () => {
-        if (isGeneratingThumbnail) {
+        if (isProcessing) {
             return (
                 <div className={styles.prompt}>
                     <Spinner />
-                    <span>Generating Preview...</span>
+                    <span>Reading File...</span>
                 </div>
             );
         }

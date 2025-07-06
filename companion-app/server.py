@@ -25,77 +25,6 @@ sock = Sock(app)
 # --- Helper Functions ---
 
 
-def get_media_properties(media_path):
-    """
-    Uses ffprobe to get duration, width, and height for a video or image.
-    This is a consolidated function with more robust error handling.
-    """
-    if not os.path.exists(media_path):
-        print(f"Error: Path does not exist for get_media_properties: {media_path}")
-        return None
-
-    is_video = any(
-        media_path.lower().endswith(ext)
-        for ext in [".mp4", ".mov", ".webm", ".mkv", ".avi"]
-    )
-
-    show_entries = "stream=width,height"
-    if is_video:
-        show_entries += ",duration"
-
-    command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        show_entries,
-        "-of",
-        "json",
-        media_path,
-    ]
-
-    try:
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,
-        )
-        data = json.loads(result.stdout)
-
-        if not data.get("streams") or len(data["streams"]) == 0:
-            print(f"ffprobe found no media streams for {media_path}")
-            return None
-
-        stream_data = data["streams"][0]
-
-        properties = {
-            "width": int(stream_data.get("width", 0)),
-            "height": int(stream_data.get("height", 0)),
-        }
-
-        if is_video:
-            properties["duration"] = float(stream_data.get("duration", 0.0))
-            if properties["duration"] == 0.0:
-                print(f"Warning: ffprobe returned 0 duration for video {media_path}.")
-        else:
-            properties["duration"] = 0.0
-
-        return properties
-
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing ffprobe for {media_path}: {e.stderr}")
-        return None
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"Error parsing ffprobe output for {media_path}: {e}")
-        return None
-    except Exception as e:
-        print(f"An unexpected error occurred in get_media_properties: {e}")
-        return None
-
 
 def process_video_task(
     job_id, source_path, background_path, settings, is_preview=False
@@ -516,6 +445,8 @@ def process_video_endpoint():
 
     if "sourceVideo" not in request.files:
         return jsonify({"error": "A source video file is always required."}), 400
+    if "sourceProperties" not in request.form:
+        return jsonify({"error": "Source properties are required."}), 400
 
     if not is_transparent and "background" not in request.files:
         return (
@@ -524,10 +455,16 @@ def process_video_endpoint():
             ),
             400,
         )
+    if not is_transparent and "backgroundProperties" not in request.form:
+        return jsonify({"error": "Background properties are required."}), 400
 
     video_file = request.files["sourceVideo"]
     background_file = request.files.get("background")
-    settings = json.loads(request.form.get("settings", "{}"))
+
+    try:
+        source_props = json.loads(request.form["sourceProperties"])
+    except (json.JSONDecodeError, KeyError):
+        return jsonify({"error": "Invalid source properties format."}), 400
 
     job_id = str(uuid.uuid4())
     job_dir = os.path.join(JOBS_DIR, job_id)
@@ -538,44 +475,27 @@ def process_video_endpoint():
     source_path = os.path.join(job_dir, f"source_video{source_ext}")
     video_file.save(source_path)
 
-    source_props = get_media_properties(source_path)
-    if not source_props:
-        return jsonify({"error": "Could not read source video properties."}), 500
-
-    response_data = {
-        "jobId": job_id,
-        "sourceDuration": source_props.get("duration", 0),
-        "sourceWidth": source_props.get("width"),
-        "sourceHeight": source_props.get("height"),
-    }
-
     job_data = {
         "id": job_id,
         "status": "uploaded",
         "progress": 0,
-        "settings": settings,
+        "settings": {},
         "sourceProperties": source_props,
     }
 
-    background_path = None
     if background_file:
-        # Save background file with its extension
+        try:
+            background_props = json.loads(request.form["backgroundProperties"])
+        except (json.JSONDecodeError, KeyError):
+            return jsonify({"error": "Invalid background properties format."}), 400
+
         _, background_ext = os.path.splitext(background_file.filename)
         background_path = os.path.join(job_dir, f"background{background_ext}")
         background_file.save(background_path)
-
-        background_props = get_media_properties(background_path)
-        if background_props:
-            response_data["backgroundWidth"] = background_props.get("width")
-            response_data["backgroundHeight"] = background_props.get("height")
-            job_data["backgroundProperties"] = background_props
-        else:
-            print(
-                f"Warning: Could not read properties for background file: {background_file.filename}"
-            )
+        job_data["backgroundProperties"] = background_props
 
     JOBS[job_id] = job_data
-    return jsonify(response_data), 200
+    return jsonify({"jobId": job_id}), 200
 
 
 @app.route("/api/process-preview/<job_id>", methods=["POST"])
