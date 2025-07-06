@@ -6,7 +6,7 @@ const Spinner = () => <div className={styles.spinner}></div>;
 interface FileInputProps {
     label: string;
     acceptedTypes: string;
-    onFileSelect: (file: File) => void;
+    onFileSelect: (file: File, previewUrl: string | null) => void;
     disabled?: boolean;
 }
 
@@ -20,10 +20,11 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
         if (disabled) return;
 
         setFile(selectedFile);
-        setPreviewUrl(null);
+        let finalPreviewUrl: string | null = null;
 
         if (selectedFile.type.startsWith('image/')) {
-            setPreviewUrl(URL.createObjectURL(selectedFile));
+            finalPreviewUrl = URL.createObjectURL(selectedFile);
+            setPreviewUrl(finalPreviewUrl);
         } else if (selectedFile.type.startsWith('video/')) {
             setIsGeneratingThumbnail(true);
             const formData = new FormData();
@@ -41,7 +42,8 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
 
                 const data = await response.json();
                 if (data.thumbnail) {
-                    setPreviewUrl(data.thumbnail);
+                    finalPreviewUrl = data.thumbnail;
+                    setPreviewUrl(finalPreviewUrl);
                 } else {
                     throw new Error('Thumbnail not found in server response.');
                 }
@@ -53,7 +55,7 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
             }
         }
 
-        onFileSelect(selectedFile);
+        onFileSelect(selectedFile, finalPreviewUrl);
     }, [onFileSelect, disabled]);
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
