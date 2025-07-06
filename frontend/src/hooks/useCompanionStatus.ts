@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 
 type CompanionStatus = 'connected' | 'disconnected';
 
-const COMPANION_URL = 'http://localhost:5000/health';
+const COMPANION_URL = `${API_BASE_URL}/health`;
 const POLLING_INTERVAL = 2500;
 const FAILURE_THRESHOLD = 2;
 

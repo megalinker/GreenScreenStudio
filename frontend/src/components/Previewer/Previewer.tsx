@@ -7,6 +7,7 @@ import Konva from 'konva';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import ThemeToggleButton from '../ThemeToggleButton/ThemeToggleButton';
+import { API_BASE_URL, WS_BASE_URL } from '../../config';
 
 // --- Custom Hooks ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -303,7 +304,7 @@ const Previewer: React.FC = () => {
                 }
 
                 try {
-                    const response = await fetch('http://localhost:5000/api/process', { method: 'POST', body: formData });
+                    const response = await fetch(`${API_BASE_URL}/api/process`, { method: 'POST', body: formData });
                     if (!response.ok) throw new Error('File upload failed on the server.');
                     const data = await response.json();
                     setJobId(data.jobId);
@@ -344,7 +345,7 @@ const Previewer: React.FC = () => {
 
     useEffect(() => {
         if (!isReadyForPreview || !jobId) return;
-        ws.current = new WebSocket('ws://localhost:5000/api/preview');
+        ws.current = new WebSocket(`${WS_BASE_URL}/api/preview`);
         ws.current.onopen = () => {
             ws.current?.send(JSON.stringify({ type: 'init', jobId }));
             requestPreviewUpdate();
@@ -355,7 +356,7 @@ const Previewer: React.FC = () => {
             else if (message.type === 'error') console.error("Preview Error:", message.message);
         };
         return () => { ws.current?.close(); };
-    }, [isReadyForPreview, jobId]);
+    }, [isReadyForPreview, jobId, requestPreviewUpdate]);
 
     useEffect(() => {
         if (isReadyForPreview && !isTransforming) {
@@ -426,7 +427,7 @@ const Previewer: React.FC = () => {
         };
 
         try {
-            const response = await fetch(`http://localhost:5000/api/process-preview/${jobId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/process-preview/${jobId}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(previewSettings),
             });
             if (!response.ok) throw new Error((await response.json()).error || 'Failed to start preview generation.');
@@ -460,7 +461,7 @@ const Previewer: React.FC = () => {
             transforms: { foreground: foregroundTransform, background: backgroundTransform },
         };
         try {
-            const response = await fetch(`http://localhost:5000/api/export/${jobId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/export/${jobId}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exportSettings),
             });
             if (!response.ok) throw new Error((await response.json()).error || 'Failed to start export.');
@@ -477,7 +478,7 @@ const Previewer: React.FC = () => {
 
         const intervalId = setInterval(async () => {
             try {
-                const response = await fetch(`http://localhost:5000/api/status/${jobId}`);
+                const response = await fetch(`${API_BASE_URL}/api/status/${jobId}`);
                 if (!response.ok) throw new Error('Status fetch failed.');
                 const data = await response.json();
 
@@ -489,7 +490,7 @@ const Previewer: React.FC = () => {
                     setPreviewGenState('idle');
                     setPreviewProgress(100);
                     setIsPreviewModeActive(true);
-                    setPreviewVideoUrl(`http://localhost:5000/api/preview-video/${jobId}?t=${new Date().getTime()}`);
+                    setPreviewVideoUrl(`${API_BASE_URL}/api/preview-video/${jobId}?t=${new Date().getTime()}`);
                     clearInterval(intervalId);
                 } else if (data.status === 'failed') {
                     const errorMsg = data.error || 'Unknown error.';
@@ -1065,7 +1066,7 @@ const Previewer: React.FC = () => {
                     {exportState === 'completed' && (
                         <div className={styles.completedContainer}>
                             <p>✅ Export Complete!</p>
-                            <a href={`http://localhost:5000/api/download/${jobId}`} className={styles.exportButton} download>Download File</a>
+                            <a href={`${API_BASE_URL}/api/download/${jobId}`} className={styles.exportButton} download>Download File</a>
                             <button onClick={resetExport} className={styles.resetButton}>Start New Export</button>
                         </div>
                     )}
