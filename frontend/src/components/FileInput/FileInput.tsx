@@ -73,13 +73,25 @@ const getMediaDetails = (mediaFile: File): Promise<{ properties: MediaProperties
         } else if (mediaFile.type.startsWith('image/')) {
             const img = new Image();
             const url = URL.createObjectURL(mediaFile);
+
             img.onload = () => {
                 const properties = {
                     width: img.width,
                     height: img.height,
                     duration: 0,
                 };
-                resolve({ properties, previewUrl: url });
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const context = canvas.getContext('2d');
+                if (context) {
+                    context.drawImage(img, 0, 0);
+                    const dataUrl = canvas.toDataURL(mediaFile.type);
+                    resolve({ properties, previewUrl: dataUrl });
+                } else {
+                    resolve({ properties, previewUrl: url });
+                }
+                URL.revokeObjectURL(url);
             };
             img.onerror = () => {
                 URL.revokeObjectURL(url);
