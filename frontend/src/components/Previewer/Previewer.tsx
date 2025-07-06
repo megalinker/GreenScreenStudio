@@ -985,7 +985,7 @@ const Previewer: React.FC = () => {
                                 <p className={styles.previewDescription}>
                                     Preview is active. Click below to return to the editor.
                                 </p>
-                                <button onClick={handleExitPreviewMode} className={styles.resetButton}>
+                                <button onClick={handleExitPreviewMode} className={styles.exportButton}>
                                     Back to Editor
                                 </button>
                             </>

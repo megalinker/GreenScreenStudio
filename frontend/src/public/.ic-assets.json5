@@ -2,7 +2,7 @@
   {
     "match": "index.html",
     "headers": {
-      "Content-Security-Policy": "default-src 'self' https://icp-api.io; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: http://localhost:5000 https://soul.megalinker.ink; connect-src 'self' https://icp0.io https://*.icp0.io https://icp-api.io https://soul.megalinker.ink wss://soul.megalinker.ink http://localhost:5000 ws://localhost:5000;"
+      "Content-Security-Policy": "default-src 'self' https://icp-api.io; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: http://localhost:5000 http://127.0.0.1:5000 https://soul.megalinker.ink; connect-src 'self' https://icp0.io https://*.icp0.io https://icp-api.io https://soul.megalinker.ink wss://soul.megalinker.ink http://localhost:5000 ws://localhost:5000 http://127.0.0.1:5000 ws://127.0.0.1:5000;"
     },
     "security_policy": "disabled"
   },
