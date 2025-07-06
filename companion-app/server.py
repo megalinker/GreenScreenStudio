@@ -633,28 +633,34 @@ def get_status(job_id):
 
 @app.route("/api/preview-video/<job_id>", methods=["GET"])
 def download_preview_video(job_id):
+    path_to_file = None
     with JOBS_LOCK:
         job = JOBS.get(job_id)
+        if job and job.get("status") == "preview_completed":
+            path_to_file = job.get("previewPath")
 
-    if not job or job.get("status") != "preview_completed":
+    if not path_to_file:
         return jsonify({"error": "Preview not found or not completed"}), 404
 
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    preview_filename = os.path.basename(job["previewPath"])
+    job_dir = os.path.dirname(path_to_file)
+    preview_filename = os.path.basename(path_to_file)
 
     return send_from_directory(job_dir, preview_filename, as_attachment=False)
 
 
 @app.route("/api/download/<job_id>", methods=["GET"])
 def download_file(job_id):
+    path_to_file = None
     with JOBS_LOCK:
         job = JOBS.get(job_id)
+        if job and job.get("status") == "completed":
+            path_to_file = job.get("outputPath")
 
-    if not job or job.get("status") != "completed":
+    if not path_to_file:
         return jsonify({"error": "Job not found or not completed"}), 404
-
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    output_filename = os.path.basename(job["outputPath"])
+    
+    job_dir = os.path.dirname(path_to_file)
+    output_filename = os.path.basename(path_to_file)
 
     return send_from_directory(job_dir, output_filename, as_attachment=True)
 
