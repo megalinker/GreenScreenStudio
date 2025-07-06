@@ -1,4 +1,4 @@
 Flask
 Flask-Cors
 flask-sock
-waitress
+gevent

@@ -660,10 +660,16 @@ def download_file(job_id):
 
 
 if __name__ == "__main__":
-    from waitress import serve
+    from gevent import pywsgi
+    from geventwebsocket.handler import WebSocketHandler
 
     worker_thread = threading.Thread(target=worker, daemon=True)
     worker_thread.start()
 
-    print("Starting production server on http://127.0.0.1:5000")
-    serve(app, host="127.0.0.1", port=5000)
+    print("Starting Gevent production server on http://127.0.0.1:5000")
+    server = pywsgi.WSGIServer(
+        ('127.0.0.1', 5000),
+        app,
+        handler_class=WebSocketHandler
+    )
+    server.serve_forever()

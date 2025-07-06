@@ -1,4 +1,4 @@
-name: Build and Release Companion App
+name: Build, Release, and Update Frontend
 
 on:
   push:
@@ -53,17 +53,33 @@ jobs:
             tar -xf ${{ matrix.ffmpeg-archive }}
             mv ffmpeg-master-latest-*/bin/ffmpeg .
           fi
-      - name: Create final package directory
+
+      - name: Assemble files for packaging
+        shell: bash
         run: |
+          # Create a clean directory for the package
           mkdir package
-          mv dist/GreenScreenCompanion* package/
-          mv ffmpeg* package/
+
+          # Copy the main executable from the 'dist' folder
+          cp dist/GreenScreenCompanion* package/
+
+          # Copy ONLY the correct FFmpeg executable
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cp ffmpeg.exe package/
+          else
+            cp ffmpeg package/
+          fi
+          
+          echo "--- Final package contents ---"
+          ls -l package
+
       - name: Package for Windows
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           Compress-Archive -Path package/* -DestinationPath GreenScreenCompanion-windows-x64.zip
           echo "ASSET_NAME=GreenScreenCompanion-windows-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Package for Unix (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -71,6 +87,7 @@ jobs:
           cd package
           zip -r ../GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip .
           echo "ASSET_NAME=GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
+          
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
         with:
@@ -98,3 +115,32 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update_frontend_version:
+    name: Update Frontend Download Links
+    runs-on: ubuntu-latest
+    needs: create_release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code on master branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: 'master'
+      - name: Get new version number from tag
+        run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Update ConnectionStatus.tsx
+        run: |
+          sed -i "s|/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+|/releases/download/${{ env.NEW_VERSION }}|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+      - name: Commit and push the updated file
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: Update companion app version to ${{ env.NEW_VERSION }}"
+            git push
+          else
+            echo "No changes to commit."
+          fi

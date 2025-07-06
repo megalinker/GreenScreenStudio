@@ -13,9 +13,9 @@ const ConnectionStatus: React.FC = () => {
     const repoUrl = 'https://github.com/megalinker/GreenScreenStudio';
 
     const downloadLinks = {
-        windows: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-windows-x64.zip`,
-        macos: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-macos-x64.zip`,
-        linux: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-linux-x64.zip`,
+        windows: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-windows-x64.zip`,
+        macos: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-macos-x64.zip`,
+        linux: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-linux-x64.zip`,
     };
 
     const downloadUrl = downloadLinks[os] || downloadLinks.linux;
