@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sock import Sock
 import glob
+import queue
 
 # --- Configuration ---
 if not os.path.exists("jobs"):
@@ -16,16 +17,42 @@ if not os.path.exists("jobs"):
 
 JOBS_DIR = "jobs"
 JOBS = {}
+JOBS_LOCK = threading.Lock()
+TASK_QUEUE = queue.Queue()
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 CORS(app)
 sock = Sock(app)
 
+
+# --- Worker Function ---
+def worker():
+    """
+    Pulls tasks from the queue and executes them one by one.
+    This function runs in a single, dedicated background thread.
+    """
+    while True:
+        try:
+            job_details = TASK_QUEUE.get()
+            job_id, source_path, background_path, settings, is_preview = job_details
+
+            print(f"Worker picked up job {job_id}. Starting processing.")
+            process_video_task(job_id, source_path, background_path, settings, is_preview)
+
+            TASK_QUEUE.task_done()
+            print(f"Worker finished job {job_id}.")
+
+        except Exception as e:
+            print(f"An error occurred in the worker thread: {e}")
+            if 'job_id' in locals():
+                with JOBS_LOCK:
+                    if job_id in JOBS:
+                        JOBS[job_id]["status"] = "failed"
+                        JOBS[job_id]["error"] = "A critical worker error occurred."
+
+
 # --- Helper Functions ---
-
-
-
 def process_video_task(
     job_id, source_path, background_path, settings, is_preview=False
 ):
@@ -35,10 +62,11 @@ def process_video_task(
     Can generate a full export or a fast preview based on the `is_preview` flag.
     """
     job_dir = os.path.join(JOBS_DIR, job_id)
-    if is_preview:
-        JOBS[job_id]["status"] = "preview_processing"
-    else:
-        JOBS[job_id]["status"] = "processing"
+    with JOBS_LOCK:
+        if is_preview:
+            JOBS[job_id]["status"] = "preview_processing"
+        else:
+            JOBS[job_id]["status"] = "processing"
 
     # --- 1. Extract settings with robust defaults ---
     is_transparent = settings.get("transparent", False)
@@ -90,12 +118,13 @@ def process_video_task(
 
     # --- 4. Build the Complex Filter Graph (The heart of the logic) ---
     filter_complex_parts = []
-    source_props = JOBS.get(job_id, {}).get("sourceProperties", {})
-    background_props = JOBS.get(job_id, {}).get("backgroundProperties", {})
+    with JOBS_LOCK:
+        source_props = JOBS.get(job_id, {}).get("sourceProperties", {})
+        background_props = JOBS.get(job_id, {}).get("backgroundProperties", {})
 
     # Determine final canvas resolution
     res_map = {"1080p": (1920, 1080), "720p": (1280, 720), "4k": (3840, 2160)}
-    final_w, final_h = 1280, 720  # Default
+    final_w, final_h = 1280, 720
     if resolution_key in res_map:
         final_w, final_h = res_map[resolution_key]
     elif resolution_key == "original_background" and background_props:
@@ -253,11 +282,12 @@ def process_video_task(
     # --- 6. Execute and Monitor the FFmpeg Process ---
     print(f"Executing FFmpeg command for job {job_id}: {' '.join(command)}")
 
-    progress_duration = (
-        duration
-        if duration and duration > 0
-        else JOBS[job_id].get("sourceProperties", {}).get("duration", 1)
-    )
+    with JOBS_LOCK:
+        progress_duration = (
+            duration
+            if duration and duration > 0
+            else JOBS[job_id].get("sourceProperties", {}).get("duration", 1)
+        )
     if progress_duration <= 0:
         progress_duration = 1  # Avoid division by zero
 
@@ -276,34 +306,38 @@ def process_video_task(
             hours, minutes, seconds, hundredths = map(int, match.groups())
             current_time = hours * 3600 + minutes * 60 + seconds + hundredths / 100
             progress = (current_time / progress_duration) * 100
-            JOBS[job_id]["progress"] = min(round(progress, 2), 100)
+            with JOBS_LOCK:
+                JOBS[job_id]["progress"] = min(round(progress, 2), 100)
 
     process.wait()
 
-    if process.returncode == 0:
-        if is_preview:
-            JOBS[job_id].update(
-                {
-                    "status": "preview_completed",
-                    "progress": 100,
-                    "previewPath": output_path,
-                }
-            )
+    with JOBS_LOCK:
+        if process.returncode == 0:
+            if is_preview:
+                JOBS[job_id].update(
+                    {
+                        "status": "preview_completed",
+                        "progress": 100,
+                        "previewPath": output_path,
+                    }
+                )
+            else:
+                JOBS[job_id].update(
+                    {"status": "completed", "progress": 100, "outputPath": output_path}
+                )
         else:
             JOBS[job_id].update(
-                {"status": "completed", "progress": 100, "outputPath": output_path}
+                {
+                    "status": "failed",
+                    "error": f"FFmpeg failed with exit code {process.returncode}. Check logs for details.",
+                }
             )
-    else:
-        JOBS[job_id].update(
-            {
-                "status": "failed",
-                "error": f"FFmpeg failed with exit code {process.returncode}. Check logs for details.",
-            }
-        )
 
 
 def generate_preview_frame(job_id, settings):
-    job = JOBS.get(job_id)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+
     if not job:
         print(f"Preview Error: Job {job_id} not found.")
         return None
@@ -494,14 +528,16 @@ def process_video_endpoint():
         background_file.save(background_path)
         job_data["backgroundProperties"] = background_props
 
-    JOBS[job_id] = job_data
+    with JOBS_LOCK:
+        JOBS[job_id] = job_data
     return jsonify({"jobId": job_id}), 200
 
 
 @app.route("/api/process-preview/<job_id>", methods=["POST"])
 def process_preview_endpoint(job_id):
-    if job_id not in JOBS:
-        return jsonify({"error": "Job not found. Please upload files first."}), 404
+    with JOBS_LOCK:
+        if job_id not in JOBS:
+            return jsonify({"error": "Job not found. Please upload files first."}), 404
 
     settings = request.get_json()
     if not settings:
@@ -530,23 +566,22 @@ def process_preview_endpoint(job_id):
             )
         background_path = background_path_list[0]
 
-    JOBS[job_id].update(
-        {"status": "preview_queued", "progress": 0, "settings": settings}
-    )
+    with JOBS_LOCK:
+        JOBS[job_id].update(
+            {"status": "preview_queued", "progress": 0, "settings": settings}
+        )
 
-    thread = threading.Thread(
-        target=process_video_task,
-        args=(job_id, source_path, background_path, settings, True),
-    )
-    thread.start()
+    task_details = (job_id, source_path, background_path, settings, True)
+    TASK_QUEUE.put(task_details)
 
-    return jsonify({"message": "Preview process started."}), 202
+    return jsonify({"message": "Preview has been queued."}), 202
 
 
 @app.route("/api/export/<job_id>", methods=["POST"])
 def export_video_endpoint(job_id):
-    if job_id not in JOBS:
-        return jsonify({"error": "Job not found. Please upload files first."}), 404
+    with JOBS_LOCK:
+        if job_id not in JOBS:
+            return jsonify({"error": "Job not found. Please upload files first."}), 404
 
     settings = request.get_json()
     if not settings:
@@ -575,20 +610,22 @@ def export_video_endpoint(job_id):
             )
         background_path = background_path_list[0]
 
-    JOBS[job_id].update({"status": "queued", "progress": 0, "settings": settings})
+    with JOBS_LOCK:
+        JOBS[job_id].update({"status": "queued", "progress": 0, "settings": settings})
 
-    thread = threading.Thread(
-        target=process_video_task,
-        args=(job_id, source_path, background_path, settings, False),
-    )
-    thread.start()
+    task_details = (job_id, source_path, background_path, settings, False)
+    TASK_QUEUE.put(task_details)
 
-    return jsonify({"message": "Export process started."}), 202
+    return jsonify({"message": "Export has been queued."}), 202
 
 
 @app.route("/api/status/<job_id>", methods=["GET"])
 def get_status(job_id):
-    job = JOBS.get(job_id)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job:
+            job = job.copy()
+
     if not job:
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
@@ -596,7 +633,9 @@ def get_status(job_id):
 
 @app.route("/api/preview-video/<job_id>", methods=["GET"])
 def download_preview_video(job_id):
-    job = JOBS.get(job_id)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+
     if not job or job.get("status") != "preview_completed":
         return jsonify({"error": "Preview not found or not completed"}), 404
 
@@ -608,7 +647,9 @@ def download_preview_video(job_id):
 
 @app.route("/api/download/<job_id>", methods=["GET"])
 def download_file(job_id):
-    job = JOBS.get(job_id)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+
     if not job or job.get("status") != "completed":
         return jsonify({"error": "Job not found or not completed"}), 404
 
@@ -619,4 +660,7 @@ def download_file(job_id):
 
 
 if __name__ == "__main__":
+    worker_thread = threading.Thread(target=worker, daemon=True)
+    worker_thread.start()
+
     app.run(host="0.0.0.0", port=5000)
