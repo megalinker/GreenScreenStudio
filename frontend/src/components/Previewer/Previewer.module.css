@@ -2,8 +2,8 @@
     display: flex;
     width: 100vw;
     height: 100vh;
-    background-color: #eef2f5;
-    color: #333;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -20,7 +20,8 @@
     position: relative;
     width: 100%;
     aspect-ratio: 16 / 9;
-    background-color: #1a1a1a;
+    background-color: var(--bg-canvas);
+    background-repeat: repeat;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
@@ -40,8 +41,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #999;
-    border: 2px dashed #444;
+    color: var(--text-placeholder);
+    border: 2px dashed var(--border-color-strong);
     border-radius: 8px;
     margin: 1rem;
     padding: 2rem;
@@ -49,7 +50,7 @@
 }
 
 .placeholder h3 {
-    color: #ccc;
+    color: var(--text-secondary);
     font-weight: 400;
 }
 
@@ -57,7 +58,7 @@
     width: 350px;
     flex-shrink: 0;
     position: relative;
-    background-color: #ffffff;
+    background-color: var(--bg-primary);
     padding: 1.5rem;
     box-shadow: -5px 0 15px rgba(0, 0, 0, 0.05);
     overflow-y: auto;
@@ -65,11 +66,17 @@
     flex-direction: column;
 }
 
-.panelTitle {
-    margin-top: 0;
+.panelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 2rem;
-    border-bottom: 1px solid #e0e0e0;
     padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panelTitle {
+    margin: 0;
     font-size: 1.5rem;
     font-weight: 600;
 }
@@ -84,21 +91,25 @@
     margin-bottom: 0.5rem;
     font-weight: 500;
     font-size: 0.9rem;
-    color: #222;
+    color: var(--text-primary);
 }
 
-.input {
+.input,
+select {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color-strong);
     border-radius: 4px;
     font-size: 1rem;
     box-sizing: border-box;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 input[type="range"] {
     padding: 0;
     cursor: pointer;
+    background-color: transparent;
 }
 
 input[type="color"] {
@@ -113,12 +124,12 @@ input[type="color"] {
     height: 16px;
     border-radius: 50%;
     margin-left: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .divider {
     border: none;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color);
     margin: 1.5rem 0;
 }
 
@@ -128,7 +139,7 @@ input[type="color"] {
     padding: 0;
     margin-left: 10px;
     cursor: pointer;
-    color: #555;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
 }
@@ -148,8 +159,8 @@ input[type="color"] {
     padding: 0.8rem;
     font-size: 1.1rem;
     font-weight: 600;
-    color: white;
-    background-color: #007bff;
+    color: var(--text-on-primary);
+    background-color: var(--primary-color);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -160,11 +171,11 @@ input[type="color"] {
 }
 
 .exportButton:hover:not(:disabled) {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
 }
 
 .exportButton:disabled {
-    background-color: #a0a0a0;
+    background-color: var(--text-disabled);
     cursor: not-allowed;
     opacity: 0.7;
 }
@@ -177,20 +188,20 @@ input[type="color"] {
 .progressLabel {
     margin-bottom: 0.5rem;
     font-size: 0.9rem;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 .progressBar {
     width: 100%;
     height: 10px;
-    background-color: #e0e0e0;
+    background-color: var(--bg-tertiary);
     border-radius: 5px;
     overflow: hidden;
 }
 
 .progressBarFill {
     height: 100%;
-    background-color: #007bff;
+    background-color: var(--primary-color);
     border-radius: 5px;
     transition: width 0.3s ease-in-out;
 }
@@ -208,17 +219,17 @@ input[type="color"] {
 }
 
 .completedContainer p {
-    color: #28a745;
+    color: var(--success-color);
 }
 
 .failedContainer p {
-    color: #dc3545;
+    color: var(--danger-color);
 }
 
 .failedContainer small {
     display: block;
     margin-bottom: 1rem;
-    color: #666;
+    color: var(--text-subtle);
     word-wrap: break-word;
 }
 
@@ -228,7 +239,7 @@ input[type="color"] {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(255, 255, 255, 0.75);
+    background-color: var(--bg-overlay);
     backdrop-filter: blur(2px);
     z-index: 100;
     transition: opacity 0.2s ease-in-out;
@@ -239,30 +250,30 @@ input[type="color"] {
 .activeProcessingSection {
     position: relative;
     z-index: 101;
-    background-color: #ffffff;
+    background-color: var(--bg-primary);
     box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-    border-color: #007bff;
+    border-color: var(--border-color-accent);
 }
 
 .resetButton {
     background: none;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color-strong);
     border-radius: 8px;
     padding: 0.6rem 1rem;
     width: 100%;
     margin-top: 0.75rem;
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s;
-    color: #333;
+    color: var(--text-primary);
 }
 
 .resetButton:hover {
-    background-color: #f0f0f0;
-    border-color: #aaa;
+    background-color: var(--bg-hover);
+    border-color: var(--border-color-hover);
 }
 
 .viewportControlGroup {
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 1.5rem;
     margin-bottom: 1.5rem;
 }
@@ -278,6 +289,7 @@ input[type="color"] {
     align-items: center;
     gap: 10px;
     font-weight: 500;
+    color: var(--text-primary);
 }
 
 .inputWithButton {
@@ -292,14 +304,14 @@ input[type="color"] {
 .inputWithButton button {
     flex-shrink: 0;
     padding: 0 1rem;
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
+    background-color: var(--bg-hover);
+    border: 1px solid var(--border-color-strong);
     border-radius: 4px;
     cursor: pointer;
 }
 
 .inputWithButton button:hover {
-    background-color: #e0e0e0;
+    background-color: var(--bg-hover);
 }
 
 .inputWithButton button:disabled {
@@ -317,7 +329,7 @@ input[type="color"] {
 .transformInfo .label {
     margin-bottom: 0.25rem;
     font-size: 0.8rem;
-    color: #555;
+    color: var(--text-secondary);
     font-weight: normal;
 }
 
@@ -334,8 +346,8 @@ input[type="color"] {
     margin-top: 1rem;
     width: 100%;
     padding: 0.5rem;
-    background-color: #f8f9fa;
-    border: 1px solid #ced4da;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color-strong);
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
@@ -343,7 +355,7 @@ input[type="color"] {
 }
 
 .resetTransformButton:hover {
-    background-color: #e9ecef;
+    background-color: var(--bg-hover);
 }
 
 .videoPlayerContainer {
@@ -365,7 +377,7 @@ input[type="color"] {
 
 .previewDescription {
     font-size: 0.9rem;
-    color: #666;
+    color: var(--text-subtle);
     margin-bottom: 1rem;
     line-height: 1.5;
 }

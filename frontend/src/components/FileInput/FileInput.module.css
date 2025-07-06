@@ -1,17 +1,17 @@
 .container {
-    border: 2px dashed #ccc;
+    border: 2px dashed var(--border-color-dashed);
     border-radius: 8px;
     padding: 1rem;
     text-align: center;
     cursor: pointer;
     transition: border-color 0.2s, background-color 0.2s;
-    background-color: #f9f9f9;
+    background-color: var(--bg-tertiary);
 }
 
 .container:hover,
 .container.dragging {
-    border-color: #007bff;
-    background-color: #f0f8ff;
+    border-color: var(--primary-color);
+    background-color: var(--bg-hover);
 }
 
 .hiddenInput {
@@ -32,12 +32,12 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 .prompt strong {
     font-size: 1.1rem;
-    color: #333;
+    color: var(--text-primary);
 }
 
 .preview {
@@ -50,35 +50,36 @@
 
 .fileName {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-subtle);
     word-break: break-all;
 }
 
 .changeButton {
     margin-top: 0.5rem;
     background: none;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color-strong);
     border-radius: 4px;
     padding: 0.25rem 0.5rem;
     font-size: 0.8rem;
+    color: var(--text-primary);
 }
 
 .disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background-color: #f0f0f0;
-    border-color: #e0e0e0;
+    background-color: var(--bg-disabled);
+    border-color: var(--border-color);
 }
 
 .disabled:hover {
-    border-color: #e0e0e0;
-    background-color: #f0f0f0;
+    border-color: var(--border-color);
+    background-color: var(--bg-disabled);
 }
 
 .spinner {
     width: 24px;
     height: 24px;
-    border: 3px solid #007bff;
+    border: 3px solid var(--primary-color);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -89,14 +90,4 @@
     to {
         transform: rotate(360deg);
     }
-}
-
-.changeButton {
-    margin-top: 0.5rem;
-    background: none;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
-    color: #333;
 }

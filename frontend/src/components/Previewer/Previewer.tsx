@@ -6,7 +6,7 @@ import CollapsibleSection from '../CollapsibleSection/CollapsibleSection';
 import Konva from 'konva';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
-
+import ThemeToggleButton from '../ThemeToggleButton/ThemeToggleButton';
 
 // --- Custom Hooks ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -760,7 +760,7 @@ const Previewer: React.FC = () => {
                     style={{
                         width: stageWidth,
                         height: stageHeight,
-                        backgroundImage: isTransparentMode && isReadyForPreview && !isPreviewModeActive ? `url(${checkerboardPattern})` : 'none'
+                        backgroundImage: isTransparentMode && isReadyForPreview && !isPreviewModeActive ? 'var(--checkerboard-light)' : 'none'
                     }}
                 >
                     {isPreviewModeActive && previewVideoUrl ? (
@@ -848,7 +848,10 @@ const Previewer: React.FC = () => {
             </main>
 
             <aside className={styles.controlsPanel}>
-                <h2 className={styles.panelTitle}>Green Screen Studio</h2>
+                <div className={styles.panelHeader}>
+                    <h2 className={styles.panelTitle}>Green Screen Studio</h2>
+                    <ThemeToggleButton />
+                </div>
 
                 {isProcessing && (
                     <div className={styles.processingOverlay} />

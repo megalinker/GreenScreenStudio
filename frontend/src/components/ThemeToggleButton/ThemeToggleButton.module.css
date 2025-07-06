@@ -1,0 +1,25 @@
+.themeToggle {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.themeToggle:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-color-hover);
+    color: var(--text-primary);
+}
+
+.icon {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease-in-out;
+}

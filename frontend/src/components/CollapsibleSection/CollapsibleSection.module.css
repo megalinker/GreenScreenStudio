@@ -1,14 +1,14 @@
 .section {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     margin-bottom: 1.5rem;
-    background-color: #fff;
-    transition: opacity 0.2s ease-in-out;
+    background-color: var(--bg-primary);
+    transition: opacity 0.2s ease-in-out, background-color 0.2s, border-color 0.2s;
 }
 
 .sectionDisabled {
     opacity: 0.6;
-    background-color: #f9f9f9;
+    background-color: var(--bg-tertiary);
 }
 
 .sectionDisabled .header {
@@ -33,7 +33,7 @@
 .enableToggle {
     width: 18px;
     height: 18px;
-    accent-color: #007bff;
+    accent-color: var(--primary-color);
     cursor: pointer;
 }
 
@@ -45,10 +45,12 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .chevron {
     transition: transform 0.2s ease-in-out;
+    color: var(--text-secondary);
 }
 
 .chevron.open {
@@ -57,7 +59,7 @@
 
 .content {
     padding: 1rem;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color);
 }
 
 .sectionDisabled .content {

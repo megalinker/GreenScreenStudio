@@ -8,7 +8,7 @@
     position: relative;
     width: 100%;
     height: 10px;
-    background-color: #ddd;
+    background-color: var(--bg-tertiary);
     border-radius: 5px;
     cursor: pointer;
 }
@@ -16,7 +16,7 @@
 .selectedRange {
     position: absolute;
     height: 100%;
-    background-color: #007bff;
+    background-color: var(--primary-color);
     border-radius: 5px;
     pointer-events: none;
 }
@@ -27,8 +27,8 @@
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
-    background-color: white;
-    border: 2px solid #007bff;
+    background-color: var(--bg-primary);
+    border: 2px solid var(--primary-color);
     border-radius: 50%;
     cursor: grab;
     z-index: 10;
@@ -45,7 +45,7 @@
     transform: translateX(-50%);
     width: 4px;
     height: 20px;
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     border-radius: 2px;
     cursor: grab;
     z-index: 20;
@@ -70,6 +70,6 @@
     justify-content: space-between;
     margin-top: 8px;
     font-size: 0.8rem;
-    color: #555;
+    color: var(--text-secondary);
     padding: 0 2px;
 }
