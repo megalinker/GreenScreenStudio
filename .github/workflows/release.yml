@@ -1,5 +1,3 @@
-# .github/workflows/release.yml
-
 name: Build, Release, and Update Frontend
 
 on:
@@ -25,7 +23,7 @@ jobs:
             ffmpeg-archive: ffmpeg.zip
           - os: macos-latest
             os-name: macOS
-            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
+            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-6.1.1.zip"
             ffmpeg-archive: ffmpeg.zip
 
     steps:
@@ -50,39 +48,36 @@ jobs:
         shell: bash
         run: |
           curl -Lo ${{ matrix.ffmpeg-archive }} "${{ matrix.ffmpeg-url }}"
-          # The extraction logic needs to handle the different archive structures
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            # johnvansickle builds have a versioned directory
             tar -xf ${{ matrix.ffmpeg-archive }}
             mv ffmpeg-*-amd64-static/ffmpeg .
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            # BtbN builds have a versioned directory and a 'bin' subdir
             unzip -q ${{ matrix.ffmpeg-archive }}
             mv ffmpeg-master-latest-*/bin/ffmpeg.exe .
           else # macOS
-            # evermeet.cx builds just have the binary in the zip
             unzip -q ${{ matrix.ffmpeg-archive }}
           fi
-          ls -l
 
-      - name: Create final package
-        shell: bash
+      - name: Create final package directory
         run: |
           mkdir package
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            mv dist/GreenScreenCompanion.exe package/
-            mv ffmpeg.exe package/
-            cd package
-            zip -r ../GreenScreenCompanion-windows-x64.zip .
-            echo "ASSET_NAME=GreenScreenCompanion-windows-x64.zip" >> $GITHUB_ENV
-          else
-            mv dist/GreenScreenCompanion package/
-            mv ffmpeg package/
-            cd package
-            # Use os-name for consistent naming
-            zip -r ../GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip .
-            echo "ASSET_NAME=GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
-          fi
+          mv dist/GreenScreenCompanion* package/
+          mv ffmpeg* package/
+
+      - name: Package for Windows
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Compress-Archive -Path package/* -DestinationPath GreenScreenCompanion-windows-x64.zip
+          echo "ASSET_NAME=GreenScreenCompanion-windows-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Package for Unix (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd package
+          zip -r ../GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip .
+          echo "ASSET_NAME=GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
           
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
@@ -126,7 +121,7 @@ jobs:
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Update ConnectionStatus.tsx
         run: |
-          sed -i 's|/releases/download/v[0-9.]*.[0-9.]*.[0-9.]*|/releases/download/${{ env.NEW_VERSION }}|g' frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          sed -i "s|/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+|/releases/download/${{ env.NEW_VERSION }}|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-windows-x64.exe|GreenScreenCompanion-windows-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-macos-x64|GreenScreenCompanion-macos-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-linux-x64|GreenScreenCompanion-linux-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
