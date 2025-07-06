@@ -7,13 +7,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  # --- JOB 1: Build executables for all platforms ---
   build_executables:
-    name: Build for ${{ matrix.os }}
+    name: Build for ${{ matrix.os-name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            os-name: Linux
+            ffmpeg-url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+            ffmpeg-archive: ffmpeg.tar.xz
+          - os: windows-latest
+            os-name: Windows
+            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            ffmpeg-archive: ffmpeg.zip
+          - os: macos-latest
+            os-name: macOS
+            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-mac64-gpl.zip"
+            ffmpeg-archive: ffmpeg.zip
 
     steps:
       - name: Checkout code
@@ -33,78 +44,83 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
 
-      - name: Package artifact
+      - name: Download and Extract FFmpeg
         shell: bash
         run: |
-          cd dist
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv GreenScreenCompanion.exe GreenScreenCompanion-windows-x64.exe
-            echo "ASSET_NAME=GreenScreenCompanion-windows-x64.exe" >> $GITHUB_ENV
-          # --- THIS IS THE CORRECTED SECTION ---
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            # The --onefile flag creates a single binary, not a .app bundle.
-            # We just rename it for consistency. No zipping needed.
-            mv GreenScreenCompanion GreenScreenCompanion-macos-x64
-            echo "ASSET_NAME=GreenScreenCompanion-macos-x64" >> $GITHUB_ENV
-          # --- END OF CORRECTION ---
+          curl -Lo ${{ matrix.ffmpeg-archive }} "${{ matrix.ffmpeg-url }}"
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            tar -xf ${{ matrix.ffmpeg-archive }}
+            mv ffmpeg-*-amd64-static/ffmpeg .
           else
-            mv GreenScreenCompanion GreenScreenCompanion-linux-x64
-            echo "ASSET_NAME=GreenScreenCompanion-linux-x64" >> $GITHUB_ENV
+            unzip ${{ matrix.ffmpeg-archive }}
+            mv ffmpeg-master-latest-*/bin/ffmpeg* .
           fi
+          ls -l
 
+      - name: Create final package
+        shell: bash
+        run: |
+          mkdir package
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            mv dist/GreenScreenCompanion.exe package/
+            mv ffmpeg.exe package/
+            cd package
+            zip -r ../GreenScreenCompanion-windows-x64.zip .
+            echo "ASSET_NAME=GreenScreenCompanion-windows-x64.zip" >> $GITHUB_ENV
+          else
+            mv dist/GreenScreenCompanion package/
+            mv ffmpeg package/
+            cd package
+            zip -r ../GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip .
+            echo "ASSET_NAME=GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
+          fi
+          
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
         with:
-          name: executable-${{ matrix.os }}
-          path: dist/${{ env.ASSET_NAME }}
+          name: package-${{ matrix.os-name }}
+          path: ${{ env.ASSET_NAME }}
 
-  # --- JOB 2: Create the GitHub Release and upload built files ---
   create_release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: build_executables
-
     permissions:
       contents: write
-
     steps:
-      - name: Download all executables from build job
+      - name: Download all packages from build job
         uses: actions/download-artifact@v4
         with:
-          pattern: executable-*
+          pattern: package-*
           path: release-assets
           merge-multiple: true
-
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
-          body: "Official release of the GreenScreenCompanion app, version ${{ github.ref_name }}."
+          body: "Official release of the GreenScreenCompanion app, version ${{ github.ref_name }}. FFmpeg is included."
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # --- JOB 3: Update the frontend code with the new version number ---
   update_frontend_version:
     name: Update Frontend Download Links
     runs-on: ubuntu-latest
     needs: create_release
-
     steps:
       - name: Checkout code on master branch
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: 'master'
-
       - name: Get new version number from tag
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
       - name: Update ConnectionStatus.tsx
         run: |
-          # Replace YOUR_USERNAME/YOUR_REPO with your actual details
-          sed -i 's|https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v[0-9.]*|https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/${{ env.NEW_VERSION }}|g' frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
-
+          sed -i 's|/releases/download/v[0-9.]*|/releases/download/${{ env.NEW_VERSION }}|g' frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          sed -i "s|GreenScreenCompanion-windows-x64.exe|GreenScreenCompanion-windows-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          sed -i "s|GreenScreenCompanion-macos-x64|GreenScreenCompanion-macos-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          sed -i "s|GreenScreenCompanion-linux-x64|GreenScreenCompanion-linux-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
       - name: Commit and push the updated file
         run: |
           git config --global user.name 'github-actions[bot]'

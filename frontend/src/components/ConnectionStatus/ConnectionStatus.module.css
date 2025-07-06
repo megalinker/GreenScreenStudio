@@ -84,6 +84,24 @@
     margin-right: 10px;
 }
 
+.safetyNote {
+    font-size: 0.9rem;
+    color: var(--text-subtle);
+    margin-top: -1rem;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+.safetyNote a {
+    color: var(--link-color);
+    font-weight: 500;
+    text-decoration: underline;
+}
+
+.safetyNote a:hover {
+    text-decoration: none;
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);

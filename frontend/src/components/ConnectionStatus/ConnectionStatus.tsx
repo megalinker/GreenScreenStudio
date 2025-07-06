@@ -10,11 +10,12 @@ const getOS = (): 'windows' | 'macos' | 'linux' => {
 
 const ConnectionStatus: React.FC = () => {
     const os = getOS();
+    const repoUrl = 'https://github.com/megalinker/GreenScreenStudio';
 
     const downloadLinks = {
-        windows: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-windows-x64.exe',
-        macos: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-macos-x64',
-        linux: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-linux-x64',
+        windows: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-windows-x64.zip`,
+        macos: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-macos-x64.zip`,
+        linux: `${repoUrl}/releases/download/v1.1.0/GreenScreenCompanion-linux-x64.zip`,
     };
 
     const downloadUrl = downloadLinks[os] || downloadLinks.linux;
@@ -29,6 +30,14 @@ const ConnectionStatus: React.FC = () => {
                     The <strong>Companion App</strong> is a small, secure program that runs on your computer
                     to perform the heavy lifting, ensuring your files are processed at full speed
                     and never leave your machine.
+                </p>
+
+                <p className={styles.safetyNote}>
+                    For your peace of mind, the app is completely open-source. You can{' '}
+                    <a href={repoUrl} target="_blank" rel="noopener noreferrer">
+                        view the code on GitHub
+                    </a>{' '}
+                    to verify its safety.
                 </p>
 
                 <a
