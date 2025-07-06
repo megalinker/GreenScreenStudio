@@ -256,14 +256,15 @@ input[type="color"] {
 }
 
 .resetButton {
-    background: none;
+    background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color-strong);
     border-radius: 8px;
     padding: 0.6rem 1rem;
     width: 100%;
     margin-top: 0.75rem;
     cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
+    font-weight: 500;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
     color: var(--text-primary);
 }
 
