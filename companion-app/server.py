@@ -97,13 +97,19 @@ def get_media_properties(media_path):
         return None
 
 
-def process_video_task(job_id, source_path, background_path, settings):
+def process_video_task(
+    job_id, source_path, background_path, settings, is_preview=False
+):
     """
     This is the master FFmpeg processing function.
     It dynamically builds a complex command based on extensive user settings.
+    Can generate a full export or a fast preview based on the `is_preview` flag.
     """
     job_dir = os.path.join(JOBS_DIR, job_id)
-    JOBS[job_id]["status"] = "processing"
+    if is_preview:
+        JOBS[job_id]["status"] = "preview_processing"
+    else:
+        JOBS[job_id]["status"] = "processing"
 
     # --- 1. Extract settings with robust defaults ---
     is_transparent = settings.get("transparent", False)
@@ -244,7 +250,24 @@ def process_video_task(job_id, source_path, background_path, settings):
     if duration and duration > 0:
         command.extend(["-t", str(duration)])
 
-    if output_format == "prores":
+    if is_preview:
+        output_extension = "mp4"
+        command.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "28",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+            ]
+        )
+        output_path = os.path.join(job_dir, f"preview.{output_extension}")
+    elif output_format == "prores":
         output_extension = "mov"
         if is_transparent:
             command.extend(
@@ -293,7 +316,9 @@ def process_video_task(job_id, source_path, background_path, settings):
             ]
         )
 
-    output_path = os.path.join(job_dir, f"output.{output_extension}")
+    if not is_preview:
+        output_path = os.path.join(job_dir, f"output.{output_extension}")
+
     command.append(output_path)
 
     # --- 6. Execute and Monitor the FFmpeg Process ---
@@ -327,9 +352,18 @@ def process_video_task(job_id, source_path, background_path, settings):
     process.wait()
 
     if process.returncode == 0:
-        JOBS[job_id].update(
-            {"status": "completed", "progress": 100, "outputPath": output_path}
-        )
+        if is_preview:
+            JOBS[job_id].update(
+                {
+                    "status": "preview_completed",
+                    "progress": 100,
+                    "previewPath": output_path,
+                }
+            )
+        else:
+            JOBS[job_id].update(
+                {"status": "completed", "progress": 100, "outputPath": output_path}
+            )
     else:
         JOBS[job_id].update(
             {
@@ -476,9 +510,6 @@ def health_check():
     return jsonify({"status": "ok", "message": "Companion app is running!"}), 200
 
 
-# REMOVED the /api/thumbnail endpoint entirely
-
-
 @app.route("/api/process", methods=["POST"])
 def process_video_endpoint():
     is_transparent = request.form.get("isTransparent") == "true"
@@ -547,6 +578,51 @@ def process_video_endpoint():
     return jsonify(response_data), 200
 
 
+@app.route("/api/process-preview/<job_id>", methods=["POST"])
+def process_preview_endpoint(job_id):
+    if job_id not in JOBS:
+        return jsonify({"error": "Job not found. Please upload files first."}), 404
+
+    settings = request.get_json()
+    if not settings:
+        return jsonify({"error": "Missing settings in request body"}), 400
+
+    is_transparent = settings.get("transparent", False)
+    job_dir = os.path.join(JOBS_DIR, job_id)
+
+    # Find files dynamically
+    source_path_list = glob.glob(os.path.join(job_dir, "source_video.*"))
+    if not source_path_list:
+        return jsonify({"error": "Source file missing on server."}), 500
+    source_path = source_path_list[0]
+
+    background_path = None
+    if not is_transparent:
+        background_path_list = glob.glob(os.path.join(job_dir, "background.*"))
+        if not background_path_list:
+            return (
+                jsonify(
+                    {
+                        "error": "Background file missing on server for non-transparent export."
+                    }
+                ),
+                500,
+            )
+        background_path = background_path_list[0]
+
+    JOBS[job_id].update(
+        {"status": "preview_queued", "progress": 0, "settings": settings}
+    )
+
+    thread = threading.Thread(
+        target=process_video_task,
+        args=(job_id, source_path, background_path, settings, True),
+    )
+    thread.start()
+
+    return jsonify({"message": "Preview process started."}), 202
+
+
 @app.route("/api/export/<job_id>", methods=["POST"])
 def export_video_endpoint(job_id):
     if job_id not in JOBS:
@@ -582,7 +658,8 @@ def export_video_endpoint(job_id):
     JOBS[job_id].update({"status": "queued", "progress": 0, "settings": settings})
 
     thread = threading.Thread(
-        target=process_video_task, args=(job_id, source_path, background_path, settings)
+        target=process_video_task,
+        args=(job_id, source_path, background_path, settings, False),
     )
     thread.start()
 
@@ -595,6 +672,18 @@ def get_status(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
+
+
+@app.route("/api/preview-video/<job_id>", methods=["GET"])
+def download_preview_video(job_id):
+    job = JOBS.get(job_id)
+    if not job or job.get("status") != "preview_completed":
+        return jsonify({"error": "Preview not found or not completed"}), 404
+
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    preview_filename = os.path.basename(job["previewPath"])
+
+    return send_from_directory(job_dir, preview_filename, as_attachment=False)
 
 
 @app.route("/api/download/<job_id>", methods=["GET"])

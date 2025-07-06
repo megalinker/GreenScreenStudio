@@ -37,7 +37,7 @@ interface Transform {
     height: number;
 }
 
-type ExportState = 'idle' | 'processing' | 'completed' | 'failed';
+type ProcessState = 'idle' | 'processing' | 'completed' | 'failed';
 
 interface BoundingBox {
     x: number;
@@ -99,10 +99,16 @@ const Previewer: React.FC = () => {
     const [availableSize, setAvailableSize] = useState({ width: 0, height: 0 });
     const [viewportScale, setViewportScale] = useState<number | 'fit'>('fit');
 
-    // Export State
-    const [exportState, setExportState] = useState<ExportState>('idle');
+    // Process State
+    const [exportState, setExportState] = useState<ProcessState>('idle');
     const [exportProgress, setExportProgress] = useState(0);
     const [exportError, setExportError] = useState<string | null>(null);
+    const [previewGenState, setPreviewGenState] = useState<Omit<ProcessState, 'completed'>>('idle');
+    const [isPreviewModeActive, setIsPreviewModeActive] = useState(false);
+    const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+    const lastActionRef = useRef<'preview' | 'export' | null>(null);
+
+
     const [exportFormat, setExportFormat] = useState<'mp4' | 'prores' | 'webm' | 'gif'>('mp4');
 
     const [sourceInfo, setSourceInfo] = useState<{ duration: number; width: number; height: number; } | null>(null);
@@ -201,6 +207,10 @@ const Previewer: React.FC = () => {
         setSelectedShapeName(null);
         setHistory([]);
         setHistoryIndex(-1);
+        setIsPreviewModeActive(false);
+        setPreviewGenState('idle');
+        setPreviewVideoUrl(null);
+        lastActionRef.current = null;
     };
 
     const resetExport = () => {
@@ -367,8 +377,42 @@ const Previewer: React.FC = () => {
         setIsPickingColor(true);
     };
 
+    const handleProcessPreview = async () => {
+        if (!jobId) return;
+        lastActionRef.current = 'preview';
+        setPreviewGenState('processing');
+
+        const previewSettings = {
+            ...settings,
+            transparent: isTransparentMode,
+            isKeyingEnabled,
+            resolution: resolution,
+            loop: loop,
+            startTime,
+            endTime,
+            transforms: { foreground: foregroundTransform, background: backgroundTransform },
+        };
+
+        try {
+            const response = await fetch(`http://localhost:5000/api/process-preview/${jobId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(previewSettings),
+            });
+            if (!response.ok) throw new Error((await response.json()).error || 'Failed to start preview generation.');
+        } catch (error: any) {
+            setPreviewGenState('failed');
+            console.error(error.message);
+        }
+    }
+
+    const handleExitPreviewMode = () => {
+        setIsPreviewModeActive(false);
+        setPreviewVideoUrl(null);
+        requestPreviewUpdate();
+    }
+
     const handleExport = async () => {
         if (!jobId) return;
+        lastActionRef.current = 'export';
         setExportState('processing');
         setExportProgress(0);
         setExportError(null);
@@ -395,29 +439,54 @@ const Previewer: React.FC = () => {
     };
 
     useEffect(() => {
-        if (exportState !== 'processing' || !jobId) return;
+        if (!jobId || (previewGenState !== 'processing' && exportState !== 'processing')) {
+            return;
+        }
+
         const intervalId = setInterval(async () => {
             try {
                 const response = await fetch(`http://localhost:5000/api/status/${jobId}`);
                 if (!response.ok) throw new Error('Status fetch failed.');
                 const data = await response.json();
-                setExportProgress(data.progress || 0);
+
                 if (data.status === 'completed') {
                     setExportState('completed');
+                    setExportProgress(100);
+                    clearInterval(intervalId);
+                } else if (data.status === 'preview_completed') {
+                    setPreviewGenState('idle');
+                    setIsPreviewModeActive(true);
+                    setPreviewVideoUrl(`http://localhost:5000/api/preview-video/${jobId}?t=${new Date().getTime()}`);
                     clearInterval(intervalId);
                 } else if (data.status === 'failed') {
-                    setExportState('failed');
-                    setExportError(data.error || 'Unknown export error.');
+                    const errorMsg = data.error || 'Unknown error.';
+                    if (lastActionRef.current === 'export') {
+                        setExportState('failed');
+                        setExportError(errorMsg);
+                    } else if (lastActionRef.current === 'preview') {
+                        setPreviewGenState('failed');
+                    }
                     clearInterval(intervalId);
+                } else if (data.status === 'processing' || data.status === 'preview_processing') {
+                    if (lastActionRef.current === 'export') {
+                        setExportProgress(data.progress || 0);
+                    }
                 }
             } catch (error) {
-                setExportState('failed');
-                setExportError('Could not get status.');
+                const errorMsg = 'Could not get status from server.';
+                if (lastActionRef.current === 'export') {
+                    setExportState('failed');
+                    setExportError(errorMsg);
+                } else if (lastActionRef.current === 'preview') {
+                    setPreviewGenState('failed');
+                }
                 clearInterval(intervalId);
             }
         }, 2000);
+
         return () => clearInterval(intervalId);
-    }, [exportState, jobId]);
+    }, [previewGenState, exportState, jobId]);
+
 
     const handleTrimChange = useCallback((newStart: number, newEnd: number) => {
         setStartTime(newStart);
@@ -646,6 +715,10 @@ const Previewer: React.FC = () => {
 
     const contentScale = stageWidth > 0 ? stageWidth / logicalWidth : 0;
 
+    // --- Disabling Logic ---
+    const isProcessing = isUploading || previewGenState === 'processing' || exportState === 'processing';
+    const arePostLoadControlsDisabled = !isReadyForPreview || isProcessing || isPreviewModeActive;
+
     return (
         <div className={styles.container}>
             <main ref={mainAreaRef} className={styles.main}>
@@ -654,10 +727,21 @@ const Previewer: React.FC = () => {
                     style={{
                         width: stageWidth,
                         height: stageHeight,
-                        backgroundImage: isTransparentMode && isReadyForPreview ? `url(${checkerboardPattern})` : 'none'
+                        backgroundImage: isTransparentMode && isReadyForPreview && !isPreviewModeActive ? `url(${checkerboardPattern})` : 'none'
                     }}
                 >
-                    {!isUploading && isReadyForPreview && stageWidth > 0 ? (
+                    {isPreviewModeActive && previewVideoUrl ? (
+                        <div className={styles.videoPlayerContainer}>
+                            <video
+                                key={previewVideoUrl}
+                                src={previewVideoUrl}
+                                controls
+                                autoPlay
+                                loop
+                                className={styles.previewVideo}
+                            />
+                        </div>
+                    ) : !isUploading && isReadyForPreview && stageWidth > 0 ? (
                         <Stage
                             width={stageWidth}
                             height={stageHeight}
@@ -742,6 +826,7 @@ const Previewer: React.FC = () => {
                             value={viewportScale}
                             onChange={(e) => setViewportScale(e.target.value === 'fit' ? 'fit' : parseFloat(e.target.value))}
                             className={styles.input}
+                            disabled={isPreviewModeActive}
                         >
                             <option value="fit">Auto-Fit</option>
                             <option value="0.5">50%</option>
@@ -752,7 +837,7 @@ const Previewer: React.FC = () => {
                     </div>
                 </div>
 
-                <CollapsibleSection title="1. Load Files" defaultOpen={true}>
+                <CollapsibleSection title="1. Load Files" defaultOpen={true} disabled={isProcessing}>
                     <div className={styles.controlGroup}>
                         <label className={styles.checkboxLabel}>
                             <input type="checkbox" checked={isTransparentMode} onChange={(e) => setIsTransparentMode(e.target.checked)} />
@@ -770,7 +855,7 @@ const Previewer: React.FC = () => {
                 <CollapsibleSection
                     title="2. Adjust Keying"
                     defaultOpen={true}
-                    disabled={!isReadyForPreview}
+                    disabled={arePostLoadControlsDisabled}
                     isToggleable={true}
                     isEnabled={isKeyingEnabled}
                     onEnabledChange={setIsKeyingEnabled}
@@ -806,7 +891,7 @@ const Previewer: React.FC = () => {
                     </div>
                 </CollapsibleSection>
 
-                <CollapsibleSection title={`Transform: ${selectedShapeName || 'None'}`} disabled={!selectedShapeName}>
+                <CollapsibleSection title={`Transform: ${selectedShapeName || 'None'}`} disabled={!selectedShapeName || arePostLoadControlsDisabled}>
                     {selectedShapeName && <div className={styles.transformInfo}>
                         <div><label className={styles.label}>Width</label><input className={styles.input} type="number" readOnly value={Math.round(currentTransform.width * currentTransform.scale)} /></div>
                         <div><label className={styles.label}>Height</label><input className={styles.input} type="number" readOnly value={Math.round(currentTransform.height * currentTransform.scale)} /></div>
@@ -816,7 +901,7 @@ const Previewer: React.FC = () => {
                     <button onClick={handleResetTransform} className={styles.resetTransformButton}>Reset</button>
                 </CollapsibleSection>
 
-                <CollapsibleSection title="3. Output Settings" defaultOpen={true} disabled={!isReadyForPreview}>
+                <CollapsibleSection title="3. Output Settings" defaultOpen={true} disabled={arePostLoadControlsDisabled}>
                     <div className={styles.controlGroup}>
                         <label htmlFor="format" className={styles.label}>Export Format</label>
                         <select id="format" name="format" value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)} disabled={isTransparentMode} className={styles.input}>
@@ -842,7 +927,7 @@ const Previewer: React.FC = () => {
                             duration={sourceInfo?.duration || 0}
                             onTrimChange={handleTrimChange}
                             onScrub={handleScrub}
-                            disabled={!isReadyForPreview}
+                            disabled={arePostLoadControlsDisabled}
                         />
                     </div>
 
@@ -856,9 +941,42 @@ const Previewer: React.FC = () => {
                     </div>
                 </CollapsibleSection>
 
-                <CollapsibleSection title="4. Export" defaultOpen={true} disabled={!isReadyForPreview}>
+                <CollapsibleSection title="4. Generate Preview" defaultOpen={true} disabled={!isReadyForPreview || isProcessing}>
+                    <div className={styles.previewControlContainer}>
+                        {!isPreviewModeActive ? (
+                            <>
+                                <p className={styles.previewDescription}>
+                                    Generate a fast, low-quality video preview to check timing and composition before the final export.
+                                </p>
+                                <button
+                                    onClick={handleProcessPreview}
+                                    className={styles.exportButton}
+                                    disabled={arePostLoadControlsDisabled}
+                                >
+                                    {previewGenState === 'processing' ? 'Generating Preview...' : 'Generate Preview'}
+                                </button>
+                                {previewGenState === 'failed' && (
+                                    <div className={styles.failedContainer} style={{ marginTop: '1rem' }}>
+                                        <p>❌ Preview Failed</p>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <p className={styles.previewDescription}>
+                                    Preview is active. Click below to return to the editor.
+                                </p>
+                                <button onClick={handleExitPreviewMode} className={styles.resetButton}>
+                                    Back to Editor
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection title="5. Export" defaultOpen={true} disabled={arePostLoadControlsDisabled}>
                     {exportState === 'idle' && (
-                        <button className={styles.exportButton} disabled={!isReadyForPreview || isUploading} onClick={handleExport}>
+                        <button className={styles.exportButton} disabled={arePostLoadControlsDisabled} onClick={handleExport}>
                             Export Video
                         </button>
                     )}
