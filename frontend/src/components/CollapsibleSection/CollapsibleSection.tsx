@@ -8,6 +8,7 @@ interface CollapsibleSectionProps {
     isToggleable?: boolean;
     isEnabled?: boolean;
     onEnabledChange?: (enabled: boolean) => void;
+    className?: string;
     disabled?: boolean;
 }
 
@@ -24,12 +25,12 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     isToggleable = false,
     isEnabled = true,
     onEnabledChange,
+    className,
     disabled = false
 }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
     const handleToggleOpen = (e: React.MouseEvent) => {
-        // Prevent toggling when clicking on the checkbox itself
         if ((e.target as HTMLElement).tagName.toLowerCase() === 'input') return;
         setIsOpen(!isOpen);
     };
@@ -41,7 +42,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     const isContentDisabled = disabled || (isToggleable && !isEnabled);
 
     return (
-        <div className={`${styles.section} ${isContentDisabled ? styles.sectionDisabled : ''}`} data-is-open={isOpen}>
+        <div className={`${styles.section} ${isContentDisabled ? styles.sectionDisabled : ''} ${className || ''}`} data-is-open={isOpen}>
             <header className={styles.header} onClick={handleToggleOpen}>
                 <div className={styles.titleContainer}>
                     {isToggleable && (
@@ -49,7 +50,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
                             type="checkbox"
                             checked={isEnabled}
                             onChange={handleCheckboxChange}
-                            onClick={e => e.stopPropagation()} // Stop click from bubbling to header
+                            onClick={e => e.stopPropagation()}
                             className={styles.enableToggle}
                             disabled={disabled}
                         />
@@ -58,7 +59,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
                 </div>
                 {!disabled && <ChevronIcon isOpen={isOpen} />}
             </header>
-            {isOpen && !isContentDisabled && (
+            {isOpen && (
                 <div className={styles.content}>
                     {children}
                 </div>

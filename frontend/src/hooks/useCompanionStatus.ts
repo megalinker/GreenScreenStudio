@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 type CompanionStatus = 'connected' | 'disconnected';
 
 const COMPANION_URL = 'http://localhost:5000/health';
 const POLLING_INTERVAL = 2500;
+const FAILURE_THRESHOLD = 2;
 
 export function useCompanionStatus() {
     const [status, setStatus] = useState<CompanionStatus>('disconnected');
     const [isPolling, setIsPolling] = useState<boolean>(true);
+    const failureCountRef = useRef(0);
 
     useEffect(() => {
         const checkStatus = async () => {
@@ -20,19 +22,23 @@ export function useCompanionStatus() {
                 clearTimeout(timeoutId);
 
                 if (response.ok && (await response.json()).status === 'ok') {
+                    failureCountRef.current = 0;
                     setStatus('connected');
                 } else {
-                    setStatus('disconnected');
+                    failureCountRef.current++;
                 }
             } catch (error) {
-                setStatus('disconnected');
-            } finally {
-                setIsPolling(false);
+                failureCountRef.current++;
             }
+
+            if (failureCountRef.current >= FAILURE_THRESHOLD) {
+                setStatus('disconnected');
+            }
+
+            setIsPolling(false);
         };
 
         checkStatus();
-
         const intervalId = setInterval(checkStatus, POLLING_INTERVAL);
 
         return () => {

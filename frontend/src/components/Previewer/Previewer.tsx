@@ -108,6 +108,7 @@ const Previewer: React.FC = () => {
     // Process State
     const [exportState, setExportState] = useState<ProcessState>('idle');
     const [exportProgress, setExportProgress] = useState(0);
+    const [previewProgress, setPreviewProgress] = useState(0);
     const [exportError, setExportError] = useState<string | null>(null);
     const [previewGenState, setPreviewGenState] = useState<Omit<ProcessState, 'completed'>>('idle');
     const [isPreviewModeActive, setIsPreviewModeActive] = useState(false);
@@ -410,7 +411,7 @@ const Previewer: React.FC = () => {
         if (!jobId) return;
         lastActionRef.current = 'preview';
         setPreviewGenState('processing');
-
+        setPreviewProgress(0);
         const previewSettings = {
             ...settings,
             transparent: isTransparentMode,
@@ -484,6 +485,7 @@ const Previewer: React.FC = () => {
                     clearInterval(intervalId);
                 } else if (data.status === 'preview_completed') {
                     setPreviewGenState('idle');
+                    setPreviewProgress(100);
                     setIsPreviewModeActive(true);
                     setPreviewVideoUrl(`http://localhost:5000/api/preview-video/${jobId}?t=${new Date().getTime()}`);
                     clearInterval(intervalId);
@@ -499,6 +501,8 @@ const Previewer: React.FC = () => {
                 } else if (data.status === 'processing' || data.status === 'preview_processing') {
                     if (lastActionRef.current === 'export') {
                         setExportProgress(data.progress || 0);
+                    } else if (lastActionRef.current === 'preview') {
+                        setPreviewProgress(data.progress || 0);
                     }
                 }
             } catch (error) {
@@ -846,6 +850,10 @@ const Previewer: React.FC = () => {
             <aside className={styles.controlsPanel}>
                 <h2 className={styles.panelTitle}>Green Screen Studio</h2>
 
+                {isProcessing && (
+                    <div className={styles.processingOverlay} />
+                )}
+
                 <div className={styles.viewportControlGroup}>
                     <div className={styles.controlGroup}>
                         <label htmlFor="viewportScale" className={styles.label}>Preview Zoom</label>
@@ -866,17 +874,17 @@ const Previewer: React.FC = () => {
                     </div>
                 </div>
 
-                <CollapsibleSection title="1. Load Files" defaultOpen={true} disabled={isProcessing}>
+                <CollapsibleSection title="1. Load Files" defaultOpen={true} disabled={isProcessing || isPreviewModeActive}>
                     <div className={styles.controlGroup}>
                         <label className={styles.checkboxLabel}>
-                            <input type="checkbox" checked={isTransparentMode} onChange={(e) => setIsTransparentMode(e.target.checked)} />
+                            <input type="checkbox" checked={isTransparentMode} onChange={(e) => setIsTransparentMode(e.target.checked)} disabled={isProcessing || isPreviewModeActive} />
                             Export with Transparent Background
                         </label>
                     </div>
                     <div className={styles.fileInputsContainer}>
-                        <FileInput key={`source-${fileInputKey}`} label="Source Video" acceptedTypes="video/*" onFileSelect={(file, props) => { setSourceVideoFile(file); setSourceInfo(props); }} />
+                        <FileInput key={`source-${fileInputKey}`} label="Source Video" acceptedTypes="video/*" onFileSelect={(file, props) => { setSourceVideoFile(file); setSourceInfo(props); }} disabled={isProcessing || isPreviewModeActive} />
                         {!isTransparentMode && (
-                            <FileInput key={`background-${fileInputKey}`} label="Background" acceptedTypes="image/*,video/*" onFileSelect={(file, props, url) => { setBackgroundFile(file); setBackgroundInfo(props); setBackgroundPreviewUrl(url); }} />
+                            <FileInput key={`background-${fileInputKey}`} label="Background" acceptedTypes="image/*,video/*" onFileSelect={(file, props, url) => { setBackgroundFile(file); setBackgroundInfo(props); setBackgroundPreviewUrl(url); }} disabled={isProcessing || isPreviewModeActive} />
                         )}
                     </div>
                 </CollapsibleSection>
@@ -930,7 +938,61 @@ const Previewer: React.FC = () => {
                     <button onClick={handleResetTransform} className={styles.resetTransformButton}>Reset</button>
                 </CollapsibleSection>
 
-                <CollapsibleSection title="3. Output Settings" defaultOpen={true} disabled={arePostLoadControlsDisabled}>
+                <CollapsibleSection
+                    title="3. Generate Preview"
+                    defaultOpen={true}
+                    disabled={!isReadyForPreview || isProcessing}
+                    className={previewGenState === 'processing' ? styles.activeProcessingSection : ''}
+                >
+                    <div className={styles.previewControlContainer}>
+                        {!isPreviewModeActive ? (
+                            <>
+                                {previewGenState === 'idle' && (
+                                    <>
+                                        <p className={styles.previewDescription}>
+                                            Generate a fast, low-quality video preview to check timing and composition before the final export.
+                                        </p>
+                                        <button
+                                            onClick={handleProcessPreview}
+                                            className={styles.exportButton}
+                                            disabled={arePostLoadControlsDisabled}
+                                        >
+                                            Generate Preview
+                                        </button>
+                                    </>
+                                )}
+                                {previewGenState === 'processing' && (
+                                    <div className={styles.progressContainer}>
+                                        <div className={styles.progressLabel}>Generating Preview... {previewProgress.toFixed(0)}%</div>
+                                        <div className={styles.progressBar}><div className={styles.progressBarFill} style={{ width: `${previewProgress}%` }}></div></div>
+                                    </div>
+                                )}
+                                {previewGenState === 'failed' && (
+                                    <div className={styles.failedContainer} style={{ marginTop: '1rem' }}>
+                                        <p>❌ Preview Failed</p>
+                                        <button onClick={handleProcessPreview} className={styles.resetButton}>Try Again</button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <p className={styles.previewDescription}>
+                                    Preview is active. Click below to return to the editor.
+                                </p>
+                                <button onClick={handleExitPreviewMode} className={styles.resetButton}>
+                                    Back to Editor
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                    title="4. Export"
+                    defaultOpen={true}
+                    disabled={arePostLoadControlsDisabled}
+                    className={exportState === 'processing' ? styles.activeProcessingSection : ''}
+                >
                     <div className={styles.controlGroup}>
                         <label htmlFor="format" className={styles.label}>Export Format</label>
                         <select id="format" name="format" value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)} disabled={isTransparentMode} className={styles.input}>
@@ -968,42 +1030,9 @@ const Previewer: React.FC = () => {
                             <option value="background">Loop Background</option>
                         </select>
                     </div>
-                </CollapsibleSection>
 
-                <CollapsibleSection title="4. Generate Preview" defaultOpen={true} disabled={!isReadyForPreview || isProcessing}>
-                    <div className={styles.previewControlContainer}>
-                        {!isPreviewModeActive ? (
-                            <>
-                                <p className={styles.previewDescription}>
-                                    Generate a fast, low-quality video preview to check timing and composition before the final export.
-                                </p>
-                                <button
-                                    onClick={handleProcessPreview}
-                                    className={styles.exportButton}
-                                    disabled={arePostLoadControlsDisabled}
-                                >
-                                    {previewGenState === 'processing' ? 'Generating Preview...' : 'Generate Preview'}
-                                </button>
-                                {previewGenState === 'failed' && (
-                                    <div className={styles.failedContainer} style={{ marginTop: '1rem' }}>
-                                        <p>❌ Preview Failed</p>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <p className={styles.previewDescription}>
-                                    Preview is active. Click below to return to the editor.
-                                </p>
-                                <button onClick={handleExitPreviewMode} className={styles.resetButton}>
-                                    Back to Editor
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </CollapsibleSection>
+                    <hr className={styles.divider} />
 
-                <CollapsibleSection title="5. Export" defaultOpen={true} disabled={arePostLoadControlsDisabled}>
                     {exportState === 'idle' && (
                         <button className={styles.exportButton} disabled={arePostLoadControlsDisabled} onClick={handleExport}>
                             Export Video

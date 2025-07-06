@@ -1,10 +1,6 @@
 import React from 'react';
 import styles from './ConnectionStatus.module.css';
 
-interface ConnectionStatusProps {
-    isPolling: boolean;
-}
-
 const getOS = (): 'windows' | 'macos' | 'linux' => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     if (userAgent.includes("win")) return "windows";
@@ -12,7 +8,7 @@ const getOS = (): 'windows' | 'macos' | 'linux' => {
     return "linux";
 };
 
-const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isPolling }) => {
+const ConnectionStatus: React.FC = () => {
     const os = getOS();
 
     const downloadLinks = {
@@ -43,12 +39,10 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isPolling }) => {
                     Download for {os.charAt(0).toUpperCase() + os.slice(1)}
                 </a>
 
-                {isPolling && (
-                    <div className={styles.status}>
-                        <span className={styles.spinner}></span>
-                        Searching for companion app... Run the downloaded file to connect.
-                    </div>
-                )}
+                <div className={styles.status}>
+                    <span className={styles.spinner}></span>
+                    Searching for companion app... Run the downloaded file to connect.
+                </div>
             </div>
         </div>
     );

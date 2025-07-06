@@ -4,10 +4,10 @@ import Previewer from './components/Previewer/Previewer';
 import './App.css';
 
 function App() {
-  const { status, isPolling } = useCompanionStatus();
+  const { status } = useCompanionStatus();
 
   if (status === 'disconnected') {
-    return <ConnectionStatus isPolling={isPolling} />;
+    return <ConnectionStatus />;
   }
 
   return <Previewer />;
