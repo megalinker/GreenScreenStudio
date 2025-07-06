@@ -264,7 +264,9 @@ const Previewer: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (isTransparentMode) setExportFormat('prores');
+        if (isTransparentMode) {
+            setExportFormat('prores');
+        }
     }, [isTransparentMode]);
 
     // This effect runs when a source file is selected and its properties are extracted
@@ -998,11 +1000,24 @@ const Previewer: React.FC = () => {
                 >
                     <div className={styles.controlGroup}>
                         <label htmlFor="format" className={styles.label}>Export Format</label>
-                        <select id="format" name="format" value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)} disabled={isTransparentMode} className={styles.input}>
-                            <option value="mp4">MP4 (H.264)</option>
-                            <option value="prores">ProRes 422 HQ (MOV)</option>
-                            <option value="webm">WebM (VP9)</option>
-                            <option value="gif">Animated GIF</option>
+                        <select
+                            id="format"
+                            name="format"
+                            value={exportFormat}
+                            onChange={(e) => setExportFormat(e.target.value as any)}
+                            disabled={isTransparentMode || arePostLoadControlsDisabled}
+                            className={styles.input}
+                        >
+                            {isTransparentMode ? (
+                                <option value="prores">ProRes 4444 (with Alpha)</option>
+                            ) : (
+                                <>
+                                    <option value="mp4">MP4 (H.264)</option>
+                                    <option value="prores">ProRes 422 HQ (MOV)</option>
+                                    <option value="webm">WebM (VP9)</option>
+                                    <option value="gif">Animated GIF</option>
+                                </>
+                            )}
                         </select>
                     </div>
                     <div className={styles.controlGroup}>
