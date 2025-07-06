@@ -40,9 +40,13 @@ jobs:
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             mv GreenScreenCompanion.exe GreenScreenCompanion-windows-x64.exe
             echo "ASSET_NAME=GreenScreenCompanion-windows-x64.exe" >> $GITHUB_ENV
+          # --- THIS IS THE CORRECTED SECTION ---
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            zip -r GreenScreenCompanion-macos.zip GreenScreenCompanion.app
-            echo "ASSET_NAME=GreenScreenCompanion-macos.zip" >> $GITHUB_ENV
+            # The --onefile flag creates a single binary, not a .app bundle.
+            # We just rename it for consistency. No zipping needed.
+            mv GreenScreenCompanion GreenScreenCompanion-macos-x64
+            echo "ASSET_NAME=GreenScreenCompanion-macos-x64" >> $GITHUB_ENV
+          # --- END OF CORRECTION ---
           else
             mv GreenScreenCompanion GreenScreenCompanion-linux-x64
             echo "ASSET_NAME=GreenScreenCompanion-linux-x64" >> $GITHUB_ENV

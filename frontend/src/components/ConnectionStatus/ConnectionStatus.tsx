@@ -12,9 +12,9 @@ const ConnectionStatus: React.FC = () => {
     const os = getOS();
 
     const downloadLinks = {
-        windows: 'https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0.0/GreenScreenCompanion.exe',
-        macos: 'https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0.0/GreenScreenCompanion.app.zip',
-        linux: 'https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v1.0.0/GreenScreenCompanion_linux',
+        windows: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-windows-x64.exe',
+        macos: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-macos-x64',
+        linux: 'https://github.com/megalinker/GreenScreenStudio/releases/download/v1.0.0/GreenScreenCompanion-linux-x64',
     };
 
     const downloadUrl = downloadLinks[os] || downloadLinks.linux;
