@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_sock import Sock
 import glob
 import queue
+from geventwebsocket.handler import WebSocketHandler
 
 # --- Configuration ---
 if not os.path.exists("jobs"):
@@ -661,7 +662,6 @@ def download_file(job_id):
 
 if __name__ == "__main__":
     from gevent import pywsgi
-    from geventwebsocket.handler import WebSocketHandler
 
     worker_thread = threading.Thread(target=worker, daemon=True)
     worker_thread.start()
