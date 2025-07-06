@@ -12,10 +12,12 @@ import glob
 import queue
 
 # --- Configuration ---
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+JOBS_DIR = os.path.join(_base_dir, "jobs")
+
 if not os.path.exists("jobs"):
     os.makedirs("jobs")
 
-JOBS_DIR = "jobs"
 JOBS = {}
 JOBS_LOCK = threading.Lock()
 TASK_QUEUE = queue.Queue()
