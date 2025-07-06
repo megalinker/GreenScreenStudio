@@ -107,6 +107,7 @@ def process_video_task(job_id, source_path, background_path, settings):
 
     # --- 1. Extract settings with robust defaults ---
     is_transparent = settings.get("transparent", False)
+    is_keying_enabled = settings.get("isKeyingEnabled", True)
     output_format = "prores" if is_transparent else settings.get("format", "mp4")
     resolution_key = settings.get("resolution", "original_source")
     transforms = settings.get("transforms", {})
@@ -121,13 +122,6 @@ def process_video_task(job_id, source_path, background_path, settings):
         duration = end_time - start_time
 
     loop_behavior = "none" if is_transparent else settings.get("loop", "none")
-
-    # Chroma key settings
-    key_color = settings.get("keyColor", "#00FF00")
-    if key_color.startswith("#"):
-        key_color = "0x" + key_color[1:]
-    similarity = settings.get("similarity", 0.2)
-    blend = settings.get("blend", 0.1)
 
     # --- 2. Build the FFmpeg Command ---
     command = ["ffmpeg", "-y"]
@@ -179,7 +173,7 @@ def process_video_task(job_id, source_path, background_path, settings):
     fg_stream = "[0:v]" if is_transparent else "[1:v]"
     audio_stream = "0:a?" if is_transparent else "1:a?"
 
-    # 4a. Foreground processing (scale and chromakey)
+    # 4a. Foreground processing (scale and optional chromakey)
     fg_scale = fg_transform.get("scale", 1.0)
     fg_base_w = source_props.get("width", 1)
     fg_base_h = source_props.get("height", 1)
@@ -187,9 +181,19 @@ def process_video_task(job_id, source_path, background_path, settings):
     fg_h = int(fg_base_h * fg_scale)
     fg_w = fg_w if fg_w % 2 == 0 else fg_w + 1
     fg_h = fg_h if fg_h % 2 == 0 else fg_h + 1
-    filter_complex_parts.append(
-        f"{fg_stream}scale={fg_w}:{fg_h},chromakey=color={key_color}:similarity={similarity}:blend={blend}[fg_processed]"
-    )
+
+    fg_filter_chain = f"{fg_stream}scale={fg_w}:{fg_h}"
+    if is_keying_enabled:
+        key_color = settings.get("keyColor", "#00FF00")
+        if key_color.startswith("#"):
+            key_color = "0x" + key_color[1:]
+        similarity = settings.get("similarity", 0.2)
+        blend = settings.get("blend", 0.1)
+        fg_filter_chain += (
+            f",chromakey=color={key_color}:similarity={similarity}:blend={blend}"
+        )
+
+    filter_complex_parts.append(f"{fg_filter_chain}[fg_processed]")
 
     final_video_stream_name = "[outv]"
 
@@ -357,8 +361,15 @@ def generate_preview_frame(job_id, settings):
         timestamp_seconds = max(1, duration * 0.1) if duration and duration > 1 else 0
 
     extract_command = [
-        "ffmpeg", "-y", "-ss", str(timestamp_seconds), "-i", source_path,
-        "-vframes", "1", preview_base_frame_path,
+        "ffmpeg",
+        "-y",
+        "-ss",
+        str(timestamp_seconds),
+        "-i",
+        source_path,
+        "-vframes",
+        "1",
+        preview_base_frame_path,
     ]
     extract_proc = subprocess.run(extract_command, capture_output=True, text=True)
     if extract_proc.returncode != 0:
@@ -375,6 +386,7 @@ def generate_preview_frame(job_id, settings):
     source_props = job.get("sourceProperties", {})
 
     is_previewing_color_pick = settings.get("isPreviewingColorPick", False)
+    is_keying_enabled = settings.get("isKeyingEnabled", True)
 
     fg_scale = fg_transform.get("scale", 1.0)
     fg_base_w = source_props.get("width", 1)
@@ -385,23 +397,20 @@ def generate_preview_frame(job_id, settings):
     fg_h = fg_h if fg_h % 2 == 0 else fg_h + 1
 
     # Conditionally build the filter graph.
-    if is_previewing_color_pick:
-        filter_complex = (
-            f"[0:v]scale={fg_w}:{fg_h},"
-            f"format=yuva444p[out]"
-        )
-    else:
+    filter_chain_parts = [f"[0:v]scale={fg_w}:{fg_h}"]
+
+    if not is_previewing_color_pick and is_keying_enabled:
         key_color = settings.get("keyColor", "#00FF00")
         if key_color.startswith("#"):
             key_color = "0x" + key_color[1:]
         similarity = settings.get("similarity", 0.2)
         blend = settings.get("blend", 0.1)
-
-        filter_complex = (
-            f"[0:v]scale={fg_w}:{fg_h},"
-            f"chromakey=color={key_color}:similarity={similarity}:blend={blend},"
-            f"format=yuva444p[out]"
+        filter_chain_parts.append(
+            f"chromakey=color={key_color}:similarity={similarity}:blend={blend}"
         )
+
+    filter_chain_parts.append("format=yuva444p")
+    filter_complex = f"{','.join(filter_chain_parts)}[out]"
 
     command.extend(["-filter_complex", filter_complex])
     command.extend(["-map", "[out]"])
@@ -467,51 +476,7 @@ def health_check():
     return jsonify({"status": "ok", "message": "Companion app is running!"}), 200
 
 
-@app.route("/api/thumbnail", methods=["POST"])
-def get_thumbnail():
-    if "video" not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
-
-    video_file = request.files["video"]
-    temp_dir = os.path.join(JOBS_DIR, "thumbnails")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # Use a unique name for the temp file and a separate name for the thumbnail
-    _, ext = os.path.splitext(video_file.filename)
-    temp_video_name = f"{uuid.uuid4()}"
-    temp_video_path = os.path.join(temp_dir, f"{temp_video_name}{ext}")
-    thumbnail_path = os.path.join(temp_dir, f"{temp_video_name}.jpg")
-
-    video_file.save(temp_video_path)
-
-    # Seek to a very early frame (0.1s) to be safe for short videos.
-    command = [
-        "ffmpeg",
-        "-ss", "00:00:00.1",
-        "-i", temp_video_path,
-        "-vframes", "1",
-        "-an",
-        "-s", "400x225",
-        thumbnail_path,
-    ]
-    # Run the command and capture output to check for errors
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    # Always clean up the uploaded video file
-    os.remove(temp_video_path)
-
-    if result.returncode == 0 and os.path.exists(thumbnail_path):
-        with open(thumbnail_path, "rb") as f:
-            encoded_string = base64.b64encode(f.read()).decode("utf-8")
-        
-        os.remove(thumbnail_path)
-        
-        return jsonify({"thumbnail": f"data:image/jpeg;base64,{encoded_string}"})
-    else:
-        print(f"Thumbnail generation failed. Stderr: {result.stderr}")
-        if os.path.exists(thumbnail_path):
-            os.remove(thumbnail_path)
-        return jsonify({"error": "Failed to generate thumbnail"}), 500
+# REMOVED the /api/thumbnail endpoint entirely
 
 
 @app.route("/api/process", methods=["POST"])

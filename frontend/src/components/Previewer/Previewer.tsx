@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styles from './Previewer.module.css';
 import FileInput from '../FileInput/FileInput';
 import Timeline from '../Timeline/Timeline';
+import CollapsibleSection from '../CollapsibleSection/CollapsibleSection';
 import Konva from 'konva';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
@@ -57,7 +58,7 @@ const DropperIcon = () => (
 
 const checkerboardPattern = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAACJJREFUeNpiZGBg6AGAgwITg3j4f8jB4w1iEEMsGgAIMAANlQI9e8n5kgAAAABJRU5ErkJggg==';
 
-// --- The Main Component ---
+// --- Main Component ---
 
 const Previewer: React.FC = () => {
     // --- State Management ---
@@ -67,6 +68,7 @@ const Previewer: React.FC = () => {
     const [sourceVideoFile, setSourceVideoFile] = useState<File | null>(null);
     const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
     const [isTransparentMode, setIsTransparentMode] = useState<boolean>(false);
+    const [isKeyingEnabled, setIsKeyingEnabled] = useState<boolean>(true);
 
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState<string | null>(null);
@@ -74,7 +76,6 @@ const Previewer: React.FC = () => {
     const [isReadyForPreview, setIsReadyForPreview] = useState<boolean>(false);
     const [isPickingColor, setIsPickingColor] = useState<boolean>(false);
     const [isTransforming, setIsTransforming] = useState<boolean>(false);
-    const [isWsConnected, setIsWsConnected] = useState(false);
     const [isAwaitingFrameForDropper, setIsAwaitingFrameForDropper] = useState(false);
     const [settings, setSettings] = useState<ChromaKeySettings>({
         keyColor: '#00ff00',
@@ -298,24 +299,24 @@ const Previewer: React.FC = () => {
                 resolution,
                 timestamp,
                 transforms,
+                isKeyingEnabled,
                 isPreviewingColorPick: isPickingColor,
             };
 
             ws.current.send(JSON.stringify({ type: 'update', settings: previewSettings }));
         }
-    }, [jobId, debouncedSettings, resolution, debouncedFgTransform, debouncedBgTransform, isPickingColor]);
+    }, [jobId, debouncedSettings, resolution, debouncedFgTransform, debouncedBgTransform, isPickingColor, isKeyingEnabled]);
 
     useEffect(() => {
         if (isReadyForPreview) {
             requestPreviewUpdate();
         }
-    }, [isPickingColor, isReadyForPreview, requestPreviewUpdate]);
+    }, [isPickingColor, isReadyForPreview, requestPreviewUpdate, isKeyingEnabled]);
 
     useEffect(() => {
         if (!isReadyForPreview || !jobId) return;
         ws.current = new WebSocket('ws://localhost:5000/api/preview');
         ws.current.onopen = () => {
-            setIsWsConnected(true);
             ws.current?.send(JSON.stringify({ type: 'init', jobId }));
             requestPreviewUpdate();
         };
@@ -324,8 +325,6 @@ const Previewer: React.FC = () => {
             if (message.type === 'preview_frame') setPreviewImage(message.image);
             else if (message.type === 'error') console.error("Preview Error:", message.message);
         };
-        ws.current.onerror = (err) => { console.error("WebSocket error:", err); setIsWsConnected(false); };
-        ws.current.onclose = () => setIsWsConnected(false);
         return () => { ws.current?.close(); };
     }, [isReadyForPreview, jobId]);
 
@@ -377,6 +376,7 @@ const Previewer: React.FC = () => {
             ...settings,
             format: isTransparentMode ? 'prores' : exportFormat,
             transparent: isTransparentMode,
+            isKeyingEnabled,
             resolution: resolution,
             loop: loop,
             startTime,
@@ -752,8 +752,7 @@ const Previewer: React.FC = () => {
                     </div>
                 </div>
 
-                <fieldset className={styles.fieldset}>
-                    <legend>1. Load Files</legend>
+                <CollapsibleSection title="1. Load Files" defaultOpen={true}>
                     <div className={styles.controlGroup}>
                         <label className={styles.checkboxLabel}>
                             <input type="checkbox" checked={isTransparentMode} onChange={(e) => setIsTransparentMode(e.target.checked)} />
@@ -766,9 +765,16 @@ const Previewer: React.FC = () => {
                             <FileInput key={`background-${fileInputKey}`} label="Background" acceptedTypes="image/*,video/*" onFileSelect={(file, url) => { setBackgroundFile(file); setBackgroundPreviewUrl(url); }} />
                         )}
                     </div>
-                </fieldset>
-                <fieldset className={styles.fieldset} disabled={!isReadyForPreview}>
-                    <legend>2. Adjust Keying</legend>
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                    title="2. Adjust Keying"
+                    defaultOpen={true}
+                    disabled={!isReadyForPreview}
+                    isToggleable={true}
+                    isEnabled={isKeyingEnabled}
+                    onEnabledChange={setIsKeyingEnabled}
+                >
                     <div className={styles.controlGroup}>
                         <label htmlFor="keyColor" className={styles.label}>Key Color
                             <span className={styles.colorSwatch} style={{ backgroundColor: settings.keyColor }}></span>
@@ -798,10 +804,9 @@ const Previewer: React.FC = () => {
                         <label htmlFor="blend" className={styles.label}>Blend: {settings.blend.toFixed(2)}</label>
                         <input id="blend" name="blend" type="range" min="0" max="0.5" step="0.01" value={settings.blend} onChange={handleSettingChange} className={styles.input} />
                     </div>
-                </fieldset>
+                </CollapsibleSection>
 
-                <fieldset className={styles.fieldset} disabled={!selectedShapeName}>
-                    <legend>Transform: {selectedShapeName || 'None'}</legend>
+                <CollapsibleSection title={`Transform: ${selectedShapeName || 'None'}`} disabled={!selectedShapeName}>
                     {selectedShapeName && <div className={styles.transformInfo}>
                         <div><label className={styles.label}>Width</label><input className={styles.input} type="number" readOnly value={Math.round(currentTransform.width * currentTransform.scale)} /></div>
                         <div><label className={styles.label}>Height</label><input className={styles.input} type="number" readOnly value={Math.round(currentTransform.height * currentTransform.scale)} /></div>
@@ -809,10 +814,9 @@ const Previewer: React.FC = () => {
                         <div><label className={styles.label}>Y Position</label><input className={styles.input} type="number" readOnly value={Math.round(currentTransform.y)} /></div>
                     </div>}
                     <button onClick={handleResetTransform} className={styles.resetTransformButton}>Reset</button>
-                </fieldset>
+                </CollapsibleSection>
 
-                <fieldset className={styles.fieldset} disabled={!isReadyForPreview}>
-                    <legend>3. Output Settings</legend>
+                <CollapsibleSection title="3. Output Settings" defaultOpen={true} disabled={!isReadyForPreview}>
                     <div className={styles.controlGroup}>
                         <label htmlFor="format" className={styles.label}>Export Format</label>
                         <select id="format" name="format" value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)} disabled={isTransparentMode} className={styles.input}>
@@ -850,10 +854,9 @@ const Previewer: React.FC = () => {
                             <option value="background">Loop Background</option>
                         </select>
                     </div>
-                </fieldset>
+                </CollapsibleSection>
 
-                <fieldset className={styles.fieldset} disabled={!isReadyForPreview}>
-                    <legend>4. Export</legend>
+                <CollapsibleSection title="4. Export" defaultOpen={true} disabled={!isReadyForPreview}>
                     {exportState === 'idle' && (
                         <button className={styles.exportButton} disabled={!isReadyForPreview || isUploading} onClick={handleExport}>
                             Export Video
@@ -879,7 +882,7 @@ const Previewer: React.FC = () => {
                             <button onClick={handleExport} className={styles.resetButton}>Try Again</button>
                         </div>
                     )}
-                </fieldset>
+                </CollapsibleSection>
             </aside>
         </div>
     );

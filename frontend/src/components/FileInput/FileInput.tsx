@@ -10,6 +10,50 @@ interface FileInputProps {
     disabled?: boolean;
 }
 
+/**
+ * Generates a thumbnail for a video file locally in the browser.
+ * @param videoFile The video file.
+ * @returns A promise that resolves with a base64 data URL of the thumbnail.
+ */
+const generateVideoThumbnail = (videoFile: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+            return reject(new Error('Canvas 2D context is not supported.'));
+        }
+
+        video.muted = true;
+        video.playsInline = true;
+
+        video.addEventListener('loadeddata', () => {
+            video.currentTime = Math.min(1, video.duration / 2);
+        });
+
+        video.addEventListener('seeked', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            URL.revokeObjectURL(video.src);
+
+            resolve(canvas.toDataURL('image/jpeg'));
+        });
+
+        video.addEventListener('error', (e) => {
+            URL.revokeObjectURL(video.src);
+            reject(new Error('Failed to load video for thumbnail generation.'));
+        });
+
+        const url = URL.createObjectURL(videoFile);
+        video.src = url;
+    });
+};
+
+
 const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelect, disabled = false }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [file, setFile] = useState<File | null>(null);
@@ -27,26 +71,10 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
             setPreviewUrl(finalPreviewUrl);
         } else if (selectedFile.type.startsWith('video/')) {
             setIsGeneratingThumbnail(true);
-            const formData = new FormData();
-            formData.append('video', selectedFile);
-
+            setPreviewUrl(null);
             try {
-                const response = await fetch('http://localhost:5000/api/thumbnail', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}`);
-                }
-
-                const data = await response.json();
-                if (data.thumbnail) {
-                    finalPreviewUrl = data.thumbnail;
-                    setPreviewUrl(finalPreviewUrl);
-                } else {
-                    throw new Error('Thumbnail not found in server response.');
-                }
+                finalPreviewUrl = await generateVideoThumbnail(selectedFile);
+                setPreviewUrl(finalPreviewUrl);
             } catch (error) {
                 console.error("Video thumbnail generation failed:", error);
                 setPreviewUrl(null);
@@ -101,7 +129,7 @@ const FileInput: React.FC<FileInputProps> = ({ label, acceptedTypes, onFileSelec
                 <>
                     <img src={previewUrl} alt="File Preview" className={styles.preview} />
                     <span className={styles.fileName}>{file.name}</span>
-                    <span className={styles.changeButton}>Change File</span>
+                    <button type="button" className={styles.changeButton}>Change File</button>
                 </>
             );
         }
