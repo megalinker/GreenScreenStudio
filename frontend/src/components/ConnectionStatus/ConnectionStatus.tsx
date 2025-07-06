@@ -20,6 +20,39 @@ const ConnectionStatus: React.FC = () => {
 
     const downloadUrl = downloadLinks[os] || downloadLinks.linux;
 
+    const instructions = {
+        windows: (
+            <>
+                Unzip the downloaded file and run <code>GreenScreenCompanion.exe</code> to connect.
+            </>
+        ),
+        macos: (
+            <>
+                Unzip, then right-click <code>GreenScreenCompanion</code> and select 'Open' to connect.
+            </>
+        ),
+        linux: (
+            <details className={styles.details}>
+                <summary>Unzip the file, then run the app from a terminal.</summary>
+                <ol className={styles.instructionList}>
+                    <li>
+                        <strong>Extract the .zip file.</strong> You can right-click it and choose "Extract Here".
+                    </li>
+                    <li>
+                        <strong>Make it executable.</strong> Open a terminal in the new folder and run:
+                        <br />
+                        <code>chmod +x GreenScreenCompanion</code>
+                    </li>
+                    <li>
+                        <strong>Run the app.</strong> In the same terminal, run:
+                        <br />
+                        <code>./GreenScreenCompanion</code>
+                    </li>
+                </ol>
+            </details>
+        ),
+    };
+
     return (
         <div className={styles.container}>
             <div className={styles.card}>
@@ -50,7 +83,7 @@ const ConnectionStatus: React.FC = () => {
 
                 <div className={styles.status}>
                     <span className={styles.spinner}></span>
-                    Searching for companion app... Run the downloaded file to connect.
+                    Searching for companion app... {instructions[os] || instructions.linux}
                 </div>
             </div>
         </div>

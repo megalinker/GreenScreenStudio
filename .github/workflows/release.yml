@@ -23,7 +23,7 @@ jobs:
             ffmpeg-archive: ffmpeg.zip
           - os: macos-latest
             os-name: macOS
-            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-6.1.1.zip"
+            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
             ffmpeg-archive: ffmpeg.zip
 
     steps:
