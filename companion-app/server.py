@@ -660,7 +660,10 @@ def download_file(job_id):
 
 
 if __name__ == "__main__":
+    from waitress import serve
+
     worker_thread = threading.Thread(target=worker, daemon=True)
     worker_thread.start()
 
-    app.run(host="0.0.0.0", port=5000)
+    print("Starting production server on http://127.0.0.1:5000")
+    serve(app, host="127.0.0.1", port=5000)
