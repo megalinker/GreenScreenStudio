@@ -1,3 +1,5 @@
+# .github/workflows/release.yml
+
 name: Build, Release, and Update Frontend
 
 on:
@@ -23,7 +25,7 @@ jobs:
             ffmpeg-archive: ffmpeg.zip
           - os: macos-latest
             os-name: macOS
-            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-mac64-gpl.zip"
+            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
             ffmpeg-archive: ffmpeg.zip
 
     steps:
@@ -48,12 +50,18 @@ jobs:
         shell: bash
         run: |
           curl -Lo ${{ matrix.ffmpeg-archive }} "${{ matrix.ffmpeg-url }}"
+          # The extraction logic needs to handle the different archive structures
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            # johnvansickle builds have a versioned directory
             tar -xf ${{ matrix.ffmpeg-archive }}
             mv ffmpeg-*-amd64-static/ffmpeg .
-          else
-            unzip ${{ matrix.ffmpeg-archive }}
-            mv ffmpeg-master-latest-*/bin/ffmpeg* .
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # BtbN builds have a versioned directory and a 'bin' subdir
+            unzip -q ${{ matrix.ffmpeg-archive }}
+            mv ffmpeg-master-latest-*/bin/ffmpeg.exe .
+          else # macOS
+            # evermeet.cx builds just have the binary in the zip
+            unzip -q ${{ matrix.ffmpeg-archive }}
           fi
           ls -l
 
@@ -71,6 +79,7 @@ jobs:
             mv dist/GreenScreenCompanion package/
             mv ffmpeg package/
             cd package
+            # Use os-name for consistent naming
             zip -r ../GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip .
             echo "ASSET_NAME=GreenScreenCompanion-${{ matrix.os-name == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
           fi
@@ -117,7 +126,7 @@ jobs:
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Update ConnectionStatus.tsx
         run: |
-          sed -i 's|/releases/download/v[0-9.]*|/releases/download/${{ env.NEW_VERSION }}|g' frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          sed -i 's|/releases/download/v[0-9.]*.[0-9.]*.[0-9.]*|/releases/download/${{ env.NEW_VERSION }}|g' frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-windows-x64.exe|GreenScreenCompanion-windows-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-macos-x64|GreenScreenCompanion-macos-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
           sed -i "s|GreenScreenCompanion-linux-x64|GreenScreenCompanion-linux-x64.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
