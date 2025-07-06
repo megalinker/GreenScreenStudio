@@ -363,14 +363,27 @@ const Previewer: React.FC = () => {
 
     useEffect(() => {
         if (!transformerRef.current) return;
-        const stage = transformerRef.current.getStage();
-        const selectedNode = stage?.findOne(`.${selectedShapeName}`);
-        if (selectedNode) {
-            transformerRef.current.nodes([selectedNode]);
-        } else {
-            transformerRef.current.nodes([]);
+
+        const transformer = transformerRef.current;
+        const stage = transformer.getStage();
+
+        if (!stage || !selectedShapeName) {
+            transformer.nodes([]);
+            transformer.getLayer()?.batchDraw();
+            return;
         }
-    }, [selectedShapeName]);
+
+        const selectedNode = stage.findOne(`.${selectedShapeName}`);
+
+        if (selectedNode) {
+            transformer.nodes([selectedNode]);
+        } else {
+            transformer.nodes([]);
+        }
+
+        transformer.getLayer()?.batchDraw();
+
+    }, [selectedShapeName, konvaFgImage, konvaBgImage]);
 
     const handleTransformStart = () => {
         setIsTransforming(true);
