@@ -10,7 +10,6 @@ from flask_cors import CORS
 from flask_sock import Sock
 import glob
 import queue
-from geventwebsocket.handler import WebSocketHandler
 
 # --- Configuration ---
 if not os.path.exists("jobs"):
@@ -661,15 +660,7 @@ def download_file(job_id):
 
 
 if __name__ == "__main__":
-    from gevent import pywsgi
-
     worker_thread = threading.Thread(target=worker, daemon=True)
     worker_thread.start()
 
-    print("Starting Gevent production server on http://127.0.0.1:5000")
-    server = pywsgi.WSGIServer(
-        ('127.0.0.1', 5000),
-        app,
-        handler_class=WebSocketHandler
-    )
-    server.serve_forever()
+    app.run(host="0.0.0.0", port=5000)
