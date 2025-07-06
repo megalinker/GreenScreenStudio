@@ -15,7 +15,7 @@ jobs:
         include:
           - os: ubuntu-latest
             os-name: Linux
-            ffmpeg-url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
             ffmpeg-archive: ffmpeg.tar.xz
           - os: windows-latest
             os-name: Windows
@@ -23,7 +23,7 @@ jobs:
             ffmpeg-archive: ffmpeg.zip
           - os: macos-latest
             os-name: macOS
-            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-6.1.1.zip"
+            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
             ffmpeg-archive: ffmpeg.zip
 
     steps:
@@ -48,15 +48,20 @@ jobs:
         shell: bash
         run: |
           curl -Lo ${{ matrix.ffmpeg-archive }} "${{ matrix.ffmpeg-url }}"
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            tar -xf ${{ matrix.ffmpeg-archive }}
-            mv ffmpeg-*-amd64-static/ffmpeg .
+          # Simplified extraction logic
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            # evermeet.cx (macOS) has a flat structure
+            unzip -q ${{ matrix.ffmpeg-archive }}
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # BtbN (Windows) uses zip
             unzip -q ${{ matrix.ffmpeg-archive }}
             mv ffmpeg-master-latest-*/bin/ffmpeg.exe .
-          else # macOS
-            unzip -q ${{ matrix.ffmpeg-archive }}
+          else # Linux
+            # BtbN (Linux) uses tar.xz
+            tar -xf ${{ matrix.ffmpeg-archive }}
+            mv ffmpeg-master-latest-*/bin/ffmpeg .
           fi
+          ls -l
 
       - name: Create final package directory
         run: |
