@@ -60,19 +60,12 @@ jobs:
       - name: Download and Create Universal FFmpeg for macOS
         if: runner.os == 'macOS'
         run: |
-          # Download both Intel (x86_64) and Apple Silicon (arm64) builds
           curl -Lo ffmpeg-intel.zip "https://evermeet.cx/ffmpeg/ffmpeg-7.0.zip"
           curl -Lo ffmpeg-arm.zip "https://evermeet.cx/ffmpeg/ffmpeg-arm64-7.0.zip"
-          
-          # Extract and rename them
           unzip -q ffmpeg-intel.zip && mv ffmpeg ffmpeg-intel
           unzip -q ffmpeg-arm.zip && mv ffmpeg ffmpeg-arm
-
-          # Use the 'lipo' tool to combine them into a single universal binary
           echo "Creating universal FFmpeg binary..."
           lipo -create -output ffmpeg ffmpeg-intel ffmpeg-arm
-          
-          # Verify the result
           lipo -info ffmpeg
 
       - name: Assemble files for packaging
@@ -139,9 +132,7 @@ jobs:
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Update ConnectionStatus.tsx
         run: |
-          # Update the version number
           sed -i "s|/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+|/releases/download/${{ env.NEW_VERSION }}|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
-          # Update the macOS filename to the new universal name
           sed -i "s|GreenScreenCompanion-macos-x64.zip|GreenScreenCompanion-macos-universal.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
       - name: Commit and push the updated file
         run: |
