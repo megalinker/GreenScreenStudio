@@ -19,35 +19,27 @@ jobs:
           - os: windows-latest
             os-name: Windows
             asset-name: GreenScreenCompanion-windows-x64.zip
-          - os: macos-14
-            os-name: "macOS (Universal)"
-            asset-name: GreenScreenCompanion-macos-universal.zip
+          - os: macos-13
+            os-name: "macOS (Intel)"
+            asset-name: GreenScreenCompanion-macos-x64.zip
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r companion-app/requirements.txt
           pip install pyinstaller
 
-      - name: Rebuild markupsafe as universal2 for macOS
-        if: runner.os == 'macOS'
-        run: |
-          pip uninstall -y markupsafe
-          CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" pip install --no-binary :all: markupsafe
-
       - name: Build with PyInstaller
         if: runner.os == 'macOS'
-        run: pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
-      
-      - name: Build with PyInstaller (Windows & Linux)
-        if: runner.os == 'Windows' || runner.os == 'Linux'
         run: pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
 
       - name: Download FFmpeg for Windows
@@ -64,16 +56,12 @@ jobs:
           tar -xf ffmpeg.tar.xz
           mv ffmpeg-master-latest-*/bin/ffmpeg .
 
-      - name: Download and Create Universal FFmpeg for macOS
+      - name: Download FFmpeg for macOS
         if: runner.os == 'macOS'
         run: |
-          curl -Lo ffmpeg-intel.zip "https://evermeet.cx/ffmpeg/ffmpeg-7.0.zip"
-          curl -Lo ffmpeg-arm.zip "https://evermeet.cx/ffmpeg/ffmpeg-arm64-7.0.zip"
-          unzip -q ffmpeg-intel.zip && mv ffmpeg ffmpeg-intel
-          unzip -q ffmpeg-arm.zip && mv ffmpeg ffmpeg-arm
-          echo "Creating universal FFmpeg binary..."
-          lipo -create -output ffmpeg ffmpeg-intel ffmpeg-arm
-          lipo -info ffmpeg
+          # Use Evermeet's Intel build (runs on both Intel & Rosetta-enabled Silicon)
+          curl -Lo ffmpeg.zip "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
+          unzip -q ffmpeg.zip && chmod +x ffmpeg
 
       - name: Assemble files for packaging
         shell: bash
@@ -87,12 +75,13 @@ jobs:
           fi
           echo "--- Final package contents ---"
           ls -l package
+
       - name: Create Zip Archive
         shell: bash
         run: |
           cd package
           zip -r ../${{ matrix.asset-name }} .
-          
+
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
         with:
@@ -112,13 +101,14 @@ jobs:
           pattern: package-*
           path: release-assets
           merge-multiple: true
+
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
           body: |
             Official release of the GreenScreenCompanion app, version ${{ github.ref_name }}.
-            FFmpeg is included. The macOS download works on both Intel and Apple Silicon Macs.
+            FFmpeg is included. The macOS download works on Intel Macs.
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -135,12 +125,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: 'master'
+
       - name: Get new version number from tag
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
       - name: Update ConnectionStatus.tsx
         run: |
           sed -i "s|/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+|/releases/download/${{ env.NEW_VERSION }}|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
-          sed -i "s|GreenScreenCompanion-macos-x64.zip|GreenScreenCompanion-macos-universal.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+
       - name: Commit and push the updated file
         run: |
           git config --global user.name 'github-actions[bot]'
