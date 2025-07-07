@@ -82,11 +82,20 @@ jobs:
           echo "--- Final package contents ---"
           ls -l package
 
-      - name: Create Zip Archive
+      - name: Create Zip Archive (Linux & macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           cd package
           zip -r ../${{ matrix.asset-name }} .
+
+      - name: Create Zip Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Compress-Archive will create the zip at the repo root:
+          Compress-Archive -Path package\* -DestinationPath $Env:GITHUB_WORKSPACE\${{ matrix.asset-name }}
+
 
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
