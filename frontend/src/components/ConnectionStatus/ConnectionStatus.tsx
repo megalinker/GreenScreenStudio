@@ -11,11 +11,12 @@ const getOS = (): 'windows' | 'macos' | 'linux' => {
 const ConnectionStatus: React.FC = () => {
     const os = getOS();
     const repoUrl = 'https://github.com/megalinker/GreenScreenStudio';
+    const releaseVersion = 'v1.2.0';
 
     const downloadLinks = {
-        windows: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-windows-x64.zip`,
-        macos: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-macos-x64.zip`,
-        linux: `${repoUrl}/releases/download/v1.1.1/GreenScreenCompanion-linux-x64.zip`,
+        windows: `${repoUrl}/releases/download/${releaseVersion}/GreenScreenCompanion-windows-x64.zip`,
+        linux: `${repoUrl}/releases/download/${releaseVersion}/GreenScreenCompanion-linux-x64.zip`,
+        macos: `${repoUrl}/releases/download/${releaseVersion}/GreenScreenCompanion-macos-x64.zip`,
     };
 
     const downloadUrl = downloadLinks[os] || downloadLinks.linux;

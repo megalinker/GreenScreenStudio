@@ -15,16 +15,13 @@ jobs:
         include:
           - os: ubuntu-latest
             os-name: Linux
-            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
-            ffmpeg-archive: ffmpeg.tar.xz
+            asset-name: GreenScreenCompanion-linux-x64.zip
           - os: windows-latest
             os-name: Windows
-            ffmpeg-url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-            ffmpeg-archive: ffmpeg.zip
-          - os: macos-latest
-            os-name: macOS
-            ffmpeg-url: "https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip"
-            ffmpeg-archive: ffmpeg.zip
+            asset-name: GreenScreenCompanion-windows-x64.zip
+          - os: macos-14
+            os-name: "macOS (Universal)"
+            asset-name: GreenScreenCompanion-macos-universal.zip
 
     steps:
       - name: Checkout code
@@ -39,60 +36,68 @@ jobs:
           pip install -r companion-app/requirements.txt
           pip install pyinstaller
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
-      - name: Download and Extract FFmpeg
-        shell: bash
         run: |
-          curl -Lo ${{ matrix.ffmpeg-archive }} "${{ matrix.ffmpeg-url }}"
-          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            unzip -q ${{ matrix.ffmpeg-archive }}
-          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            unzip -q ${{ matrix.ffmpeg-archive }}
-            mv ffmpeg-master-latest-*/bin/ffmpeg.exe .
-          else # Linux
-            tar -xf ${{ matrix.ffmpeg-archive }}
-            mv ffmpeg-master-latest-*/bin/ffmpeg .
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
+          else
+            pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
           fi
+      
+      - name: Download FFmpeg for Windows
+        if: runner.os == 'Windows'
+        run: |
+          curl -Lo ffmpeg.zip "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          unzip -q ffmpeg.zip
+          mv ffmpeg-master-latest-*/bin/ffmpeg.exe .
+
+      - name: Download FFmpeg for Linux
+        if: runner.os == 'Linux'
+        run: |
+          curl -Lo ffmpeg.tar.xz "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+          tar -xf ffmpeg.tar.xz
+          mv ffmpeg-master-latest-*/bin/ffmpeg .
+
+      - name: Download and Create Universal FFmpeg for macOS
+        if: runner.os == 'macOS'
+        run: |
+          # Download both Intel (x86_64) and Apple Silicon (arm64) builds
+          curl -Lo ffmpeg-intel.zip "https://evermeet.cx/ffmpeg/ffmpeg-7.0.zip"
+          curl -Lo ffmpeg-arm.zip "https://evermeet.cx/ffmpeg/ffmpeg-arm64-7.0.zip"
+          
+          # Extract and rename them
+          unzip -q ffmpeg-intel.zip && mv ffmpeg ffmpeg-intel
+          unzip -q ffmpeg-arm.zip && mv ffmpeg ffmpeg-arm
+
+          # Use the 'lipo' tool to combine them into a single universal binary
+          echo "Creating universal FFmpeg binary..."
+          lipo -create -output ffmpeg ffmpeg-intel ffmpeg-arm
+          
+          # Verify the result
+          lipo -info ffmpeg
 
       - name: Assemble files for packaging
         shell: bash
         run: |
-          # Create a clean directory for the package
           mkdir package
-
-          # Copy the main executable from the 'dist' folder
           cp dist/GreenScreenCompanion* package/
-
-          # Copy ONLY the correct FFmpeg executable
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             cp ffmpeg.exe package/
           else
             cp ffmpeg package/
           fi
-          
           echo "--- Final package contents ---"
           ls -l package
-
-      - name: Package for Windows
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          Compress-Archive -Path package/* -DestinationPath GreenScreenCompanion-windows-x64.zip
-          echo "ASSET_NAME=GreenScreenCompanion-windows-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Package for Unix (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Create Zip Archive
         shell: bash
         run: |
           cd package
-          zip -r ../GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip .
-          echo "ASSET_NAME=GreenScreenCompanion-${{ runner.os == 'macOS' && 'macos' || 'linux' }}-x64.zip" >> $GITHUB_ENV
+          zip -r ../${{ matrix.asset-name }} .
           
       - name: Upload artifact for release job
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.os-name }}
-          path: ${{ env.ASSET_NAME }}
+          path: ${{ matrix.asset-name }}
 
   create_release:
     name: Create GitHub Release
@@ -111,7 +116,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
-          body: "Official release of the GreenScreenCompanion app, version ${{ github.ref_name }}. FFmpeg is included."
+          body: |
+            Official release of the GreenScreenCompanion app, version ${{ github.ref_name }}.
+            FFmpeg is included. The macOS download works on both Intel and Apple Silicon Macs.
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,7 +139,10 @@ jobs:
         run: echo "NEW_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Update ConnectionStatus.tsx
         run: |
+          # Update the version number
           sed -i "s|/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+|/releases/download/${{ env.NEW_VERSION }}|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
+          # Update the macOS filename to the new universal name
+          sed -i "s|GreenScreenCompanion-macos-x64.zip|GreenScreenCompanion-macos-universal.zip|g" frontend/src/components/ConnectionStatus/ConnectionStatus.tsx
       - name: Commit and push the updated file
         run: |
           git config --global user.name 'github-actions[bot]'
