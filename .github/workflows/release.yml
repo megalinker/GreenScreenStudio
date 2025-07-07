@@ -35,13 +35,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r companion-app/requirements.txt
           pip install pyinstaller
-      - name: Build with PyInstaller
-        run: |
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
-          else
-            pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
-          fi
+
+      - name: Build with PyInstaller (Windows & Linux)
+        if: runner.os == 'Windows' || runner.os == 'Linux'
+        run: pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
+
+      - name: Build with PyInstaller (macOS Universal)
+        if: runner.os == 'macOS'
+        run: pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
       
       - name: Download FFmpeg for Windows
         if: runner.os == 'Windows'
