@@ -171,13 +171,7 @@ yarn start
 4. Push to your fork (`git push origin feature/...`).
 5. Open a Pull Request.
 
-Please follow the [Contributor Code of Conduct](CODE_OF_CONDUCT.md).
-
 ---
-
-## 📄 License
-
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ---
 
