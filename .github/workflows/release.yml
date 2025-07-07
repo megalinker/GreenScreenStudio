@@ -36,14 +36,20 @@ jobs:
           pip install -r companion-app/requirements.txt
           pip install pyinstaller
 
+      - name: Rebuild markupsafe as universal2 for macOS
+        if: runner.os == 'macOS'
+        run: |
+          pip uninstall -y markupsafe
+          CFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" pip install --no-binary :all: markupsafe
+
+      - name: Build with PyInstaller
+        if: runner.os == 'macOS'
+        run: pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
+      
       - name: Build with PyInstaller (Windows & Linux)
         if: runner.os == 'Windows' || runner.os == 'Linux'
         run: pyinstaller --onefile --name "GreenScreenCompanion" companion-app/server.py
 
-      - name: Build with PyInstaller (macOS Universal)
-        if: runner.os == 'macOS'
-        run: pyinstaller --onefile --name "GreenScreenCompanion" --target-arch universal2 companion-app/server.py
-      
       - name: Download FFmpeg for Windows
         if: runner.os == 'Windows'
         run: |
