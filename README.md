@@ -145,9 +145,6 @@ Ensure to update hostname and ports for production deployments.
    yarn start
    ```
 
-yarn start
-
-```
 3. **Open** your browser at [`http://localhost:3000`](http://localhost:3000) or the demo link.
 
 ---
@@ -170,8 +167,6 @@ yarn start
 3. Commit your changes (`git commit -m 'Add feature'`).
 4. Push to your fork (`git push origin feature/...`).
 5. Open a Pull Request.
-
----
 
 ---
 
