@@ -180,5 +180,3 @@ Ensure to update hostname and ports for production deployments.
 ---
 
 Happy chroma-keying! 🎬
-
-```
